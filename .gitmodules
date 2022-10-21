@@ -1,0 +1,3 @@
+[submodule "example/Micropython/st7735_mpy"]
+	path = example/Micropython/st7735_mpy
+	url = https://github.com/mmMicky/st7735_mpy.git
