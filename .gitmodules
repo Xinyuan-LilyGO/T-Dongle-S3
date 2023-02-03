@@ -1,3 +1,9 @@
 [submodule "example/Micropython/st7735_mpy"]
 	path = example/Micropython/st7735_mpy
 	url = https://github.com/mmMicky/st7735_mpy.git
+[submodule "example/ESP-IDF/components/esp-idf-lib"]
+	path = example/ESP-IDF/components/esp-idf-lib
+	url = https://github.com/UncleRus/esp-idf-lib.git
+[submodule "example/ESP-IDF/components/LovyanGFX"]
+	path = example/ESP-IDF/components/LovyanGFX
+	url = https://github.com/lovyan03/LovyanGFX.git
