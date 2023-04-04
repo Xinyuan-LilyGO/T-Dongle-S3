@@ -7,9 +7,9 @@ An ESP32S3 development board that can freely use WIFI, BLE, TF, LED, TFT_LCD fun
 
 ## Product 📷
 
-|  Product |  Product Link |
-| :--------: | :---------: |
-| T-Dongle-S3 |  [aliexpress](https://www.aliexpress.us/item/1005004860003638.html)   |
+|   Product   |                            Product Link                            |
+| :---------: | :----------------------------------------------------------------: |
+| T-Dongle-S3 | [aliexpress](https://www.aliexpress.us/item/1005004860003638.html) |
 
 
 # Quick Start
@@ -36,3 +36,10 @@ An ESP32S3 development board that can freely use WIFI, BLE, TF, LED, TFT_LCD fun
 > - tft_config.py is already built into the firmware. The examples in the examples directory can be used directly.
 > - For detailed function query, please refer to the following link.
 > - [[Micropython doc](https://docs.micropython.org/en/latest/index.html)]
+
+## Tips
+
+- The program can be written normally, but there is still no display after writing
+    1. There are factory test files in the firmware folder, which can be flashed into the board to check whether the board is normal. If there is still no display, then it can be judged that there is a problem with the board or the screen
+    2. Delete the <TFT_eSPI> in the libraries, and replace the <TFT_eSPI> in the <lib> folder of the main page to the libraries directory
+    3. When opening the Arduino IDE, it prompts whether to upgrade the library, please choose not to upgrade, otherwise it will overwrite the configuration of the <TFT_eSPI> display
