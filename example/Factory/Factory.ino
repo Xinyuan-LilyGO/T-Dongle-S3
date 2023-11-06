@@ -15,6 +15,9 @@
 #include "lvgl.h"    // https://github.com/lvgl/lvgl
 #include <FastLED.h> // https://github.com/FastLED/FastLED
 
+LV_IMG_DECLARE(image_logo);
+
+
 TFT_eSPI tft = TFT_eSPI();
 CRGB leds;
 OneButton button(BTN_PIN, true);
@@ -135,6 +138,17 @@ void setup() {
   xTaskCreatePinnedToCore(led_task, "led_task", 1024, NULL, 1, NULL, 0);
 
   lvgl_init();
+
+  // Show CC CE
+  lv_obj_t * img_cc = lv_img_create(lv_scr_act());
+  lv_img_set_src(img_cc,&image_logo);
+  lv_obj_center(img_cc);
+  int i = 500;
+  while(i--){
+    lv_task_handler();delay(5);
+  }
+  lv_obj_del(img_cc);
+  // End
 
   tv = lv_tileview_create(lv_scr_act());
   lv_obj_remove_style(tv, NULL, LV_PART_SCROLLBAR);
