@@ -15,11 +15,7 @@ An ESP32S3 development board that can freely use WIFI, BLE, TF, LED, TFT_LCD fun
 # Quick Start
 ## Arduino 
 > Arduino:
->- Click "File" in the upper left corner -> Preferences -> Additional Development >Board Manager URL -> Enter the URL in the input box.
-(ESP32S3 is a new chip, and the SDK version needs to be version 2.0.3 or above)
-> `https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json`
->-  Click OK and the software will be installed by itself. After installation, restart the Arduino IDE software.
->- Search for ESP32 in Tools->Board Manager and install ESP32-Arduino SDK
+>- In Arduino Preferences, on the Settings tab, enter the `https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json` URL in the `Additional boards manager URLs` input box. **Please pay attention to the version. The test phase is using 2.0.14. It is not certain that versions above 2.0.14 can run. When the operation is abnormal, please downgrade to a version below 2.0.14.** , As of 2024/08/02, TFT_eSPI does not work on versions higher than 2.0.14, see [TFT_eSPI/issue3329](https://github.com/Bodmer/TFT_eSPI/issues/3329)
 ![](image/Arduino_board.png)
 >- Copy all files in the lib folder to `\Arduino\libraries`
 >- Select the settings as shown. Note that the FLASH size partition and size may be modified depending on the board.
