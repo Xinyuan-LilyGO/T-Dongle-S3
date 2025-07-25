@@ -55,4 +55,4 @@ Please enter the upload mode manually.
    2. Release the BOOT button
    3. Upload sketch
 
-3. If the above is invalid, burn the [binary file](./firmware/README.MD)  to check whether the hardware is normal
+3. If the above is invalid, burn the [binary file](./firmware)  to check whether the hardware is normal
