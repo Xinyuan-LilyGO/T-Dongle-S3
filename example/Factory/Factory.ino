@@ -143,7 +143,7 @@ void setup() {
   lv_obj_t * img_cc = lv_img_create(lv_scr_act());
   lv_img_set_src(img_cc,&image_logo);
   lv_obj_center(img_cc);
-  int i = 500;
+  int i = 1000;
   while(i--){
     lv_task_handler();delay(5);
   }
