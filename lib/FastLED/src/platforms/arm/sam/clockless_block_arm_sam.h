@@ -29,7 +29,7 @@ typedef union {
 #define TOTAL ( (T1+TADJUST) + (T2+TADJUST) + (T3+TADJUST) )
 #define T1_MARK (TOTAL - (T1+TADJUST))
 #define T2_MARK (T1_MARK - (T2+TADJUST))
-template <uint8_t LANES, int FIRST_PIN, int T1, int T2, int T3, EOrder RGB_ORDER = RGB, int XTRA0 = 0, bool FLIP = false, int WAIT_TIME = 50>
+template <uint8_t LANES, int FIRST_PIN, int T1, int T2, int T3, EOrder RGB_ORDER = RGB, int XTRA0 = 0, bool FLIP = false, int WAIT_TIME = 280>
 class InlineBlockClocklessController : public CPixelLEDController<RGB_ORDER, LANES, PORT_MASK> {
 	typedef typename FastPin<FIRST_PIN>::port_ptr_t data_ptr_t;
 	typedef typename FastPin<FIRST_PIN>::port_t data_t;
@@ -140,12 +140,12 @@ public:
         return DUE_TIMER_VAL;
     }
 
-    template<int BITS,int PX> __attribute__ ((always_inline)) inline static void writeBits(register uint32_t & next_mark, register Lines & b, Lines & b3, PixelController<RGB_ORDER,LANES, PORT_MASK> &pixels) { // , register uint32_t & b2)  {
+    template<int BITS,int PX> __attribute__ ((always_inline)) inline static void writeBits(FASTLED_REGISTER uint32_t & next_mark, FASTLED_REGISTER Lines & b, Lines & b3, PixelController<RGB_ORDER,LANES, PORT_MASK> &pixels) { // , FASTLED_REGISTER uint32_t & b2)  {
         Lines b2;
         transpose8x1(b.bytes,b2.bytes);
 
-        register uint8_t d = pixels.template getd<PX>(pixels);
-        register uint8_t scale = pixels.template getscale<PX>(pixels);
+        FASTLED_REGISTER uint8_t d = pixels.template getd<PX>(pixels);
+        FASTLED_REGISTER uint8_t scale = pixels.template getscale<PX>(pixels);
 
         for(uint32_t i = 0; (i < LANES) && (i<8); i++) {
             while(DUE_TIMER_VAL < next_mark);

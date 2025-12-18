@@ -1,3 +1,7 @@
+/// @file    Pacifica.ino
+/// @brief   Gentle, blue-green ocean wave animation
+/// @example Pacifica.ino
+
 //
 //  "Pacifica"
 //  Gentle, blue-green ocean waves.
@@ -16,6 +20,15 @@ FASTLED_USING_NAMESPACE
 #define COLOR_ORDER         GRB
 
 //////////////////////////////////////////////////////////////////////////
+
+
+void pacifica_one_layer( CRGBPalette16& p, uint16_t cistart, uint16_t wavescale, uint8_t bri, uint16_t ioff);
+void pacifica_loop();
+void pacifica_add_whitecaps();
+void pacifica_deepen_colors();
+
+
+
 
 CRGB leds[NUM_LEDS];
 
@@ -68,6 +81,7 @@ CRGBPalette16 pacifica_palette_2 =
 CRGBPalette16 pacifica_palette_3 = 
     { 0x000208, 0x00030E, 0x000514, 0x00061A, 0x000820, 0x000927, 0x000B2D, 0x000C33, 
       0x000E39, 0x001040, 0x001450, 0x001860, 0x001C70, 0x002080, 0x1040BF, 0x2060FF };
+
 
 
 void pacifica_loop()

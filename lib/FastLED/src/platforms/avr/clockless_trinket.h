@@ -4,6 +4,7 @@
 #include "../../controller.h"
 #include "../../lib8tion.h"
 #include <avr/interrupt.h> // for cli/se definitions
+#include "../../fl/force_inline.h"
 
 FASTLED_NAMESPACE_BEGIN
 
@@ -24,10 +25,39 @@ FASTLED_NAMESPACE_BEGIN
 
 #define US_PER_TICK (64 / (F_CPU/1000000))
 
-// Variations on the functions in delay.h - w/a loop var passed in to preserve registers across calls by the optimizer/compiler
-template<int CYCLES> inline void _dc(register uint8_t & loopvar);
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Due to the tight timing specifications of WS2811 and friends on AVR, interrupts are disabled by default to keep timings exact.
+// However, many WS2811 or WS2812 strips are surprisingly tolerant of jittery timings (such as those caused by interrupts), on the
+// condition that the shortest pulse in the specification (representing a 0 bit) is kept under a certain length. After exceeding
+// that length it would be interpreted as a 1, causing a glitch. 
+// 
+// If you set FASTLED_ALLOW_INTERRUPTS to 1, interrupts will only be disabled for a few cycles at a time, when necessary to keep
+// this signal pulse short.
+// 
+// Beware: even with FASTLED_ALLOW_INTERRUPTS enabled, you must ensure that your interrupt handlers are *very* fast. If they take
+// longer than 5µs, which is 80 clock cycles on a 16MHz AVR, the strip might latch partway through rendering, and you will see big
+// glitches.
+// 
+// Remember to account for the interrupt overhead when writing your ISR. This accounts for at least 10 cycles, often 20+.
+//
+// If you are using multiple timers with interrupts, you can set them out of phase so they only fire one at a time. 
+//
+// TODO: it would be possible to support longer interrupts providing that they only fire during the "on" pulse - holding the
+//       signal high indefinitely will never latch, although it would affect the framerate. Maybe the subject of a future PR…
+//
+// See https://wp.josh.com/2014/05/13/ws2812-neopixels-are-not-so-finicky-once-you-get-to-know-them/ for more information on the
+// tolerances.
+//
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<int _LOOP, int PAD> __attribute__((always_inline)) inline void _dc_AVR(register uint8_t & loopvar) {
+//#define FASTLED_ALLOW_INTERRUPTS 1
+
+
+// Variations on the functions in delay.h - w/a loop var passed in to preserve registers across calls by the optimizer/compiler
+template<int CYCLES> inline void _dc(FASTLED_REGISTER uint8_t & loopvar);
+
+template<int _LOOP, int PAD> FASTLED_FORCE_INLINE void _dc_AVR(FASTLED_REGISTER uint8_t & loopvar) {
 	_dc<PAD>(loopvar);
 	// The convolution in here is to ensure that the state of the carry flag coming into the delay loop is preserved
 	asm __volatile__ (  "BRCS L_PC%=\n\t"
@@ -35,49 +65,58 @@ template<int _LOOP, int PAD> __attribute__((always_inline)) inline void _dc_AVR(
 						"L_PC%=: LDI %[loopvar], %[_LOOP]\n\tLL_%=: DEC %[loopvar]\n\t BRNE LL_%=\n\tBSET 0\n\t"
 						"L_DONE%=:\n\t"
 						:
-							[loopvar] "+a" (loopvar) : [_LOOP] "M" (_LOOP) : );
+							[loopvar] "+d" (loopvar) : [_LOOP] "M" (_LOOP) : );
 }
 
-template<int CYCLES> __attribute__((always_inline)) inline void _dc(register uint8_t & loopvar) {
+template<int CYCLES> FASTLED_FORCE_INLINE void _dc(FASTLED_REGISTER uint8_t & loopvar) {
 	_dc_AVR<CYCLES/6,CYCLES%6>(loopvar);
 }
-template<> __attribute__((always_inline)) inline void _dc<-6>(register uint8_t & ) {}
-template<> __attribute__((always_inline)) inline void _dc<-5>(register uint8_t & ) {}
-template<> __attribute__((always_inline)) inline void _dc<-4>(register uint8_t & ) {}
-template<> __attribute__((always_inline)) inline void _dc<-3>(register uint8_t & ) {}
-template<> __attribute__((always_inline)) inline void _dc<-2>(register uint8_t & ) {}
-template<> __attribute__((always_inline)) inline void _dc<-1>(register uint8_t & ) {}
-template<> __attribute__((always_inline)) inline void _dc< 0>(register uint8_t & ) {}
-template<> __attribute__((always_inline)) inline void _dc< 1>(register uint8_t & ) {asm __volatile__("mov r0,r0":::);}
+template<> FASTLED_FORCE_INLINE void _dc<-6>(FASTLED_REGISTER uint8_t & ) {}
+template<> FASTLED_FORCE_INLINE void _dc<-5>(FASTLED_REGISTER uint8_t & ) {}
+template<> FASTLED_FORCE_INLINE void _dc<-4>(FASTLED_REGISTER uint8_t & ) {}
+template<> FASTLED_FORCE_INLINE void _dc<-3>(FASTLED_REGISTER uint8_t & ) {}
+template<> FASTLED_FORCE_INLINE void _dc<-2>(FASTLED_REGISTER uint8_t & ) {}
+template<> FASTLED_FORCE_INLINE void _dc<-1>(FASTLED_REGISTER uint8_t & ) {}
+template<> FASTLED_FORCE_INLINE void _dc< 0>(FASTLED_REGISTER uint8_t & ) {}
+template<> FASTLED_FORCE_INLINE void _dc< 1>(FASTLED_REGISTER uint8_t & ) {asm __volatile__("mov r0,r0":::);}
 #if defined(__LGT8F__) 
-template<> __attribute__((always_inline)) inline void _dc< 2>(register uint8_t & loopvar) { _dc<1>(loopvar); _dc<1>(loopvar); }
+template<> FASTLED_FORCE_INLINE void _dc< 2>(FASTLED_REGISTER uint8_t & loopvar) { _dc<1>(loopvar); _dc<1>(loopvar); }
 #else
-template<> __attribute__((always_inline)) inline void _dc< 2>(register uint8_t & ) {asm __volatile__("rjmp .+0":::);}
+template<> FASTLED_FORCE_INLINE void _dc< 2>(FASTLED_REGISTER uint8_t & ) {asm __volatile__("rjmp .+0":::);}
 #endif
-template<> __attribute__((always_inline)) inline void _dc< 3>(register uint8_t & loopvar) { _dc<2>(loopvar); _dc<1>(loopvar); }
-template<> __attribute__((always_inline)) inline void _dc< 4>(register uint8_t & loopvar) { _dc<2>(loopvar); _dc<2>(loopvar); }
-template<> __attribute__((always_inline)) inline void _dc< 5>(register uint8_t & loopvar) { _dc<2>(loopvar); _dc<3>(loopvar); }
-template<> __attribute__((always_inline)) inline void _dc< 6>(register uint8_t & loopvar) { _dc<2>(loopvar); _dc<2>(loopvar); _dc<2>(loopvar);}
-template<> __attribute__((always_inline)) inline void _dc< 7>(register uint8_t & loopvar) { _dc<4>(loopvar); _dc<3>(loopvar); }
-template<> __attribute__((always_inline)) inline void _dc< 8>(register uint8_t & loopvar) { _dc<4>(loopvar); _dc<4>(loopvar); }
-template<> __attribute__((always_inline)) inline void _dc< 9>(register uint8_t & loopvar) { _dc<5>(loopvar); _dc<4>(loopvar); }
-template<> __attribute__((always_inline)) inline void _dc<10>(register uint8_t & loopvar) { _dc<6>(loopvar); _dc<4>(loopvar); }
-template<> __attribute__((always_inline)) inline void _dc<11>(register uint8_t & loopvar) { _dc<10>(loopvar); _dc<1>(loopvar); }
-template<> __attribute__((always_inline)) inline void _dc<12>(register uint8_t & loopvar) { _dc<10>(loopvar); _dc<2>(loopvar); }
-template<> __attribute__((always_inline)) inline void _dc<13>(register uint8_t & loopvar) { _dc<10>(loopvar); _dc<3>(loopvar); }
-template<> __attribute__((always_inline)) inline void _dc<14>(register uint8_t & loopvar) { _dc<10>(loopvar); _dc<4>(loopvar); }
-template<> __attribute__((always_inline)) inline void _dc<15>(register uint8_t & loopvar) { _dc<10>(loopvar); _dc<5>(loopvar); }
-template<> __attribute__((always_inline)) inline void _dc<16>(register uint8_t & loopvar) { _dc<10>(loopvar); _dc<6>(loopvar); }
-template<> __attribute__((always_inline)) inline void _dc<17>(register uint8_t & loopvar) { _dc<10>(loopvar); _dc<7>(loopvar); }
-template<> __attribute__((always_inline)) inline void _dc<18>(register uint8_t & loopvar) { _dc<10>(loopvar); _dc<8>(loopvar); }
-template<> __attribute__((always_inline)) inline void _dc<19>(register uint8_t & loopvar) { _dc<10>(loopvar); _dc<9>(loopvar); }
-template<> __attribute__((always_inline)) inline void _dc<20>(register uint8_t & loopvar) { _dc<10>(loopvar); _dc<10>(loopvar); }
+template<> FASTLED_FORCE_INLINE void _dc< 3>(FASTLED_REGISTER uint8_t & loopvar) { _dc<2>(loopvar); _dc<1>(loopvar); }
+template<> FASTLED_FORCE_INLINE void _dc< 4>(FASTLED_REGISTER uint8_t & loopvar) { _dc<2>(loopvar); _dc<2>(loopvar); }
+template<> FASTLED_FORCE_INLINE void _dc< 5>(FASTLED_REGISTER uint8_t & loopvar) { _dc<2>(loopvar); _dc<3>(loopvar); }
+template<> FASTLED_FORCE_INLINE void _dc< 6>(FASTLED_REGISTER uint8_t & loopvar) { _dc<2>(loopvar); _dc<2>(loopvar); _dc<2>(loopvar);}
+template<> FASTLED_FORCE_INLINE void _dc< 7>(FASTLED_REGISTER uint8_t & loopvar) { _dc<4>(loopvar); _dc<3>(loopvar); }
+template<> FASTLED_FORCE_INLINE void _dc< 8>(FASTLED_REGISTER uint8_t & loopvar) { _dc<4>(loopvar); _dc<4>(loopvar); }
+template<> FASTLED_FORCE_INLINE void _dc< 9>(FASTLED_REGISTER uint8_t & loopvar) { _dc<5>(loopvar); _dc<4>(loopvar); }
+template<> FASTLED_FORCE_INLINE void _dc<10>(FASTLED_REGISTER uint8_t & loopvar) { _dc<6>(loopvar); _dc<4>(loopvar); }
+template<> FASTLED_FORCE_INLINE void _dc<11>(FASTLED_REGISTER uint8_t & loopvar) { _dc<10>(loopvar); _dc<1>(loopvar); }
+template<> FASTLED_FORCE_INLINE void _dc<12>(FASTLED_REGISTER uint8_t & loopvar) { _dc<10>(loopvar); _dc<2>(loopvar); }
+template<> FASTLED_FORCE_INLINE void _dc<13>(FASTLED_REGISTER uint8_t & loopvar) { _dc<10>(loopvar); _dc<3>(loopvar); }
+template<> FASTLED_FORCE_INLINE void _dc<14>(FASTLED_REGISTER uint8_t & loopvar) { _dc<10>(loopvar); _dc<4>(loopvar); }
+template<> FASTLED_FORCE_INLINE void _dc<15>(FASTLED_REGISTER uint8_t & loopvar) { _dc<10>(loopvar); _dc<5>(loopvar); }
+template<> FASTLED_FORCE_INLINE void _dc<16>(FASTLED_REGISTER uint8_t & loopvar) { _dc<10>(loopvar); _dc<6>(loopvar); }
+template<> FASTLED_FORCE_INLINE void _dc<17>(FASTLED_REGISTER uint8_t & loopvar) { _dc<10>(loopvar); _dc<7>(loopvar); }
+template<> FASTLED_FORCE_INLINE void _dc<18>(FASTLED_REGISTER uint8_t & loopvar) { _dc<10>(loopvar); _dc<8>(loopvar); }
+template<> FASTLED_FORCE_INLINE void _dc<19>(FASTLED_REGISTER uint8_t & loopvar) { _dc<10>(loopvar); _dc<9>(loopvar); }
+template<> FASTLED_FORCE_INLINE void _dc<20>(FASTLED_REGISTER uint8_t & loopvar) { _dc<10>(loopvar); _dc<10>(loopvar); }
+
+#if (FASTLED_ALLOW_INTERRUPTS == 1)
+// If interrupts are enabled, HI1 actually takes 2 clocks due to cli().
+// To keep the timings exact, D3 (which precedes it) must be 1 clock less.
+// The same adjustment must be made for D2, due the corresponding sei().
+#define D_INT_ADJ 1
+#else
+#define D_INT_ADJ 0
+#endif
 
 #define DINTPIN(T,ADJ,PINADJ) (T-(PINADJ+ADJ)>0) ? _dc<T-(PINADJ+ADJ)>(loopvar) : _dc<0>(loopvar);
 #define DINT(T,ADJ) if(AVR_PIN_CYCLES(DATA_PIN)==1) { DINTPIN(T,ADJ,1) } else { DINTPIN(T,ADJ,2); }
 #define _D1(ADJ) DINT(T1,ADJ)
-#define _D2(ADJ) DINT(T2,ADJ)
-#define _D3(ADJ) DINT(T3,ADJ)
+#define _D2(ADJ) DINT(T2,ADJ+D_INT_ADJ)
+#define _D3(ADJ) DINT(T3,ADJ+D_INT_ADJ)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -120,7 +159,9 @@ protected:
 	virtual void showPixels(PixelController<RGB_ORDER> & pixels) {
 
 		mWait.wait();
+#if (!defined(FASTLED_ALLOW_INTERRUPTS) || FASTLED_ALLOW_INTERRUPTS == 0)
 		cli();
+#endif
 
 		if(pixels.mLen > 0) {
 			showRGBInternal(pixels);
@@ -128,7 +169,8 @@ protected:
 
 		// Adjust the timer
 #if (!defined(NO_CLOCK_CORRECTION) || (NO_CLOCK_CORRECTION == 0)) && (FASTLED_ALLOW_INTERRUPTS == 0)
-        uint32_t microsTaken = (uint32_t)pixels.size() * (uint32_t)CLKS_TO_MICROS(24 * (T1 + T2 + T3));
+		uint32_t microsTaken = pixels.size();
+		microsTaken *= CLKS_TO_MICROS(24 * (T1 + T2 + T3));
 
         // adust for approximate observed actal runtime (as of January 2015)
         // roughly 9.6 cycles per pixel, which is 0.6us/pixel at 16MHz
@@ -169,26 +211,56 @@ protected:
         // a 16-bit variable.  The difference between /1000 and /1024 only starts showing
         // up in the range of about 100 pixels, so many ATtiny projects won't even
         // see a clock difference due to the approximation there.
-		uint16_t microsTaken = (uint32_t)nLeds * (uint32_t)CLKS_TO_MICROS((24) * (T1 + T2 + T3));
-        MS_COUNTER += (microsTaken >> 10);
+		uint32_t microsTaken = nLeds;
+		microsTaken *= CLKS_TO_MICROS(24 * (T1 + T2 + T3));
+		//uint16_t microsTaken = (uint32_t)nLeds * (uint32_t)CLKS_TO_MICROS((24) * (T1 + T2 + T3));
+        MS_COUNTER += static_cast<uint16_t>(microsTaken >> 10);
 #endif
 
 #endif
 
+#if (!defined(FASTLED_ALLOW_INTERRUPTS) || FASTLED_ALLOW_INTERRUPTS == 0)
 		sei();
+#endif
 		mWait.mark();
 	}
 #define USE_ASM_MACROS
 
+
 #if defined(__AVR_ATmega4809__)
 // Not used - place holder so existing ASM_VARS macro can remain the same
 #define ASM_VAR_PORT "r" (*FastPin<DATA_PIN>::port())
+
+#elif defined(__AVR_ATtinyxy7__) || defined(__AVR_ATtinyxy6__) || defined(__AVR_ATtinyxy4__) || defined(__AVR_ATtinyxy2__)
+// Probably unused - place holder so existing ASM_VARS macro can remain the same
+#define ASM_VAR_PORT "r" (((PORT_t*)FastPin<DATA_PIN>::port())->OUT)
+
 #else
+// existing ASM_VARS macro for other AVR platforms
 #define ASM_VAR_PORT "M" (FastPin<DATA_PIN>::port() - 0x20)
-#endif
+
+#endif // ASM_VAR_PORT
+
 
 // The variables that our various asm statements use.  The same block of variables needs to be declared for
 // all the asm blocks because GCC is pretty stupid and it would clobber variables happily or optimize code away too aggressively
+
+// The existing code led to the generation of spurios move operations in the asm statements
+// that threw of timing when optimizing for debugging with -Og.
+// With the constraint "[b1] "=&a" (b1)", this is not any longer the case.
+// The new code appears to work in other circumstances as well, but it will only 
+// be activated when FASTLED_AVR_LEGACY_CODE == 0.
+// If FASTLED_AVR_LEGACY_CODE is not defined, then it will be set to 1 only
+// if the -Os (__OPTIMIZE_SIZE__) option has not been chosen.
+
+#ifndef FASTLED_AVR_LEGACY_CODE
+#ifdef __OPTIMIZE_SIZE__
+#define FASTLED_AVR_LEGACY_CODE 1
+#else
+#define FASTLED_AVR_LEGACY_CODE 0
+#endif
+#endif
+#if FASTLED_AVR_LEGACY_CODE
 #define ASM_VARS : /* write variables */				\
 				[count] "+x" (count),					\
 				[data] "+z" (data),						\
@@ -214,11 +286,46 @@ protected:
 				[O1] "M" (RGB_BYTE1(RGB_ORDER)),		\
 				[O2] "M" (RGB_BYTE2(RGB_ORDER))		\
 				: "cc" /* clobber registers */
-
+#else
+#warning "Experimental code to support debugging! Define FASTLED_AVR_LEGACY_CODE as 1 to force using legacy code."
+#define ASM_VARS : /* write variables */				\
+				[count] "+x" (count),					\
+				[data] "+z" (data),						\
+				[b1] "=&a" (b1),							\
+	                        [d0] "+r" (d0),							\
+				[d1] "+r" (d1),							\
+				[d2] "+r" (d2),							\
+				[loopvar] "+a" (loopvar),				\
+				[scale_base] "+a" (scale_base)			\
+				: /* use variables */					\
+				[ADV] "r" (advanceBy),					\
+				[b0] "a" (b0),							\
+				[hi] "r" (hi),							\
+				[lo] "r" (lo),							\
+				[s0] "r" (s0),					  		\
+				[s1] "r" (s1),							\
+				[s2] "r" (s2),							\
+				[e0] "r" (e0),							\
+				[e1] "r" (e1),							\
+				[e2] "r" (e2),							\
+				[PORT] ASM_VAR_PORT,                    \
+				[O0] "M" (RGB_BYTE0(RGB_ORDER)),		\
+				[O1] "M" (RGB_BYTE1(RGB_ORDER)),		\
+				[O2] "M" (RGB_BYTE2(RGB_ORDER))		\
+				: "cc" /* clobber registers */
+#endif
+	
+#if (FASTLED_ALLOW_INTERRUPTS == 1)
+#define HI1CLI cli()
+#define QLO2SEI sei()
+#else
+#define HI1CLI
+#define QLO2SEI
+#endif
 #if defined(__AVR_ATmega4809__)
 
 // 1 cycle, write hi to the port
-#define HI1 do {*FastPin<DATA_PIN>::port()=hi;} while(0);
+#define HI1 HI1CLI; do {*FastPin<DATA_PIN>::port()=hi;} while(0);
 // 1 cycle, write lo to the port
 #define LO1 do {*FastPin<DATA_PIN>::port()=lo;} while(0);
 
@@ -226,14 +333,14 @@ protected:
 
 // Note: the code in the else in HI1/LO1 will be turned into an sts (2 cycle, 2 word)
 // 1 cycle, write hi to the port
-#define HI1 FASTLED_SLOW_CLOCK_ADJUST if((int)(FastPin<DATA_PIN>::port())-0x20 < 64) { asm __volatile__("out %[PORT], %[hi]" ASM_VARS ); } else { *FastPin<DATA_PIN>::port()=hi; }
+#define HI1 FASTLED_SLOW_CLOCK_ADJUST HI1CLI; if((int)(FastPin<DATA_PIN>::port())-0x20 < 64) { asm __volatile__("out %[PORT], %[hi]" ASM_VARS ); } else { *FastPin<DATA_PIN>::port()=hi; }
 // 1 cycle, write lo to the port
 #define LO1 if((int)(FastPin<DATA_PIN>::port())-0x20 < 64) { asm __volatile__("out %[PORT], %[lo]" ASM_VARS ); } else { *FastPin<DATA_PIN>::port()=lo; }
 
 #endif
 
 // 2 cycles, sbrs on flipping the line to lo if we're pushing out a 0
-#define QLO2(B, N) asm __volatile__("sbrs %[" #B "], " #N ASM_VARS ); LO1;
+#define QLO2(B, N) asm __volatile__("sbrs %[" #B "], " #N ASM_VARS ); LO1; QLO2SEI;
 // load a byte from ram into the given var with the given offset
 #define LD2(B,O) asm __volatile__("ldd %[" #B "], Z + %[" #O "]\n\t" ASM_VARS );
 // 4 cycles - load a byte from ram into the scaling scratch space with the given offset, clear the target var, clear carry
@@ -363,7 +470,7 @@ protected:
 		data_t mask = FastPin<DATA_PIN>::mask();
 		uint8_t scale_base = 0;
 
-		// register uint8_t *end = data + nLeds;
+		// FASTLED_REGISTER uint8_t *end = data + nLeds;
 		data_t hi = *port | mask;
 		data_t lo = *port & ~mask;
 		*port = lo;
@@ -382,9 +489,9 @@ protected:
 		int16_t advanceBy = pixels.advanceBy();
 		uint16_t count = pixels.mLen;
 
-		uint8_t s0 = pixels.mScale.raw[RO(0)];
-		uint8_t s1 = pixels.mScale.raw[RO(1)];
-		uint8_t s2 = pixels.mScale.raw[RO(2)];
+		uint8_t s0 = pixels.mColorAdjustment.premixed.raw[RO(0)];
+		uint8_t s1 = pixels.mColorAdjustment.premixed.raw[RO(1)];
+		uint8_t s2 = pixels.mColorAdjustment.premixed.raw[RO(2)];
 #if (FASTLED_SCALE8_FIXED==1)
 		s0++; s1++; s2++;
 #endif

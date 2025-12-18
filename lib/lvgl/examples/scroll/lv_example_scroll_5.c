@@ -1,13 +1,12 @@
 #include "../lv_examples.h"
 #if LV_BUILD_EXAMPLES && LV_FONT_DEJAVU_16_PERSIAN_HEBREW
 
-
 /**
  * Scrolling with Right To Left base direction
  */
 void lv_example_scroll_5(void)
 {
-    lv_obj_t * obj = lv_obj_create(lv_scr_act());
+    lv_obj_t * obj = lv_obj_create(lv_screen_active());
     lv_obj_set_style_base_dir(obj, LV_BASE_DIR_RTL, 0);
     lv_obj_set_size(obj, 200, 100);
     lv_obj_center(obj);

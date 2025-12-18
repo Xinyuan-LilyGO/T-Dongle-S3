@@ -1,53 +1,20 @@
+/// @file hsv2rgb.cpp
+/// Functions to convert from the HSV colorspace to the RGB colorspace
+
+/// Disables pragma messages and warnings
 #define FASTLED_INTERNAL
-#include <stdint.h>
+#include "fl/stdint.h"
 
 #include "FastLED.h"
+#include "fl/math_macros.h"
+
+#include "hsv2rgb.h"
 
 FASTLED_NAMESPACE_BEGIN
 
-// Functions to convert HSV colors to RGB colors.
-//
-//  The basically fall into two groups: spectra, and rainbows.
-//  Spectra and rainbows are not the same thing.  Wikipedia has a good
-//  illustration here
-//   http://upload.wikimedia.org/wikipedia/commons/f/f6/Prism_compare_rainbow_01.png
-//  from this article
-//   http://en.wikipedia.org/wiki/Rainbow#Number_of_colours_in_spectrum_or_rainbow
-//  that shows a 'spectrum' and a 'rainbow' side by side.  Among other
-//  differences, you'll see that a 'rainbow' has much more yellow than
-//  a plain spectrum.  "Classic" LED color washes are spectrum based, and
-//  usually show very little yellow.
-//
-//  Wikipedia's page on HSV color space, with pseudocode for conversion
-//  to RGB color space
-//   http://en.wikipedia.org/wiki/HSL_and_HSV
-//  Note that their conversion algorithm, which is (naturally) very popular
-//  is in the "maximum brightness at any given hue" style, vs the "uniform
-//  brightness for all hues" style.
-//
-//  You can't have both; either purple is the same brightness as red, e.g
-//    red = #FF0000 and purple = #800080 -> same "total light" output
-//  OR purple is 'as bright as it can be', e.g.
-//    red = #FF0000 and purple = #FF00FF -> purple is much brighter than red.
-//  The colorspace conversions here try to keep the apparent brightness
-//  constant even as the hue varies.
-//
-//  Adafruit's "Wheel" function, discussed here
-//   http://forums.adafruit.com/viewtopic.php?f=47&t=22483
-//  is also of the "constant apparent brightness" variety.
-//
-//  TODO: provide the 'maximum brightness no matter what' variation.
-//
-//  See also some good, clear Arduino C code from Kasper Kamperman
-//   http://www.kasperkamperman.com/blog/arduino/arduino-programming-hsb-to-rgb/
-//  which in turn was was based on Windows C code from "nico80"
-//   http://www.codeproject.com/Articles/9207/An-HSB-RGBA-colour-picker
-
-
-
-
-
+/// HSV to RGB implementation in raw C, platform independent
 void hsv2rgb_raw_C (const struct CHSV & hsv, struct CRGB & rgb);
+/// HSV to RGB implementation in raw C, for the AVR platform only
 void hsv2rgb_raw_avr(const struct CHSV & hsv, struct CRGB & rgb);
 
 #if defined(__AVR__) && !defined( LIB8_ATTINY )
@@ -63,10 +30,23 @@ void hsv2rgb_raw(const struct CHSV & hsv, struct CRGB & rgb)
 #endif
 
 
-
+/// Apply dimming compensation to values
 #define APPLY_DIMMING(X) (X)
+
+/// Divide the color wheel into eight sections, 32 elements each
+/// @todo Unused. Remove?
 #define HSV_SECTION_6 (0x20)
+
+/// Divide the color wheel into four sections, 64 elements each
+/// @todo I believe this is mis-named, and should be HSV_SECTION_4
 #define HSV_SECTION_3 (0x40)
+
+/// Inline version of hsv2rgb_spectrum which returns a CRGB object.
+CRGB hsv2rgb_spectrum( const struct CHSV& hsv) {
+    CRGB rgb;
+    hsv2rgb_spectrum(hsv, rgb);
+    return rgb;
+}
 
 void hsv2rgb_raw_C (const struct CHSV & hsv, struct CRGB & rgb)
 {
@@ -75,12 +55,12 @@ void hsv2rgb_raw_C (const struct CHSV & hsv, struct CRGB & rgb)
     // the output more visually linear.
 
     // Apply dimming curves
-    uint8_t value = APPLY_DIMMING( hsv.val);
+    uint8_t value = APPLY_DIMMING( hsv.val);  // cppcheck-suppress selfAssignment
     uint8_t saturation = hsv.sat;
 
     // The brightness floor is minimum number that all of
     // R, G, and B will be set to.
-    uint8_t invsat = APPLY_DIMMING( 255 - saturation);
+    uint8_t invsat = APPLY_DIMMING( 255 - saturation);  // cppcheck-suppress selfAssignment
     uint8_t brightness_floor = (value * invsat) / 256;
 
     // The color amplitude is the maximum amount of R, G, and B
@@ -167,10 +147,10 @@ void hsv2rgb_raw_avr(const struct CHSV & hsv, struct CRGB & rgb)
 
     // Saturation more useful the other way around
     saturation = 255 - saturation;
-    uint8_t invsat = APPLY_DIMMING( saturation );
+    uint8_t invsat = APPLY_DIMMING( saturation );  // cppcheck-suppress selfAssignment
 
     // Apply dimming curves
-    value = APPLY_DIMMING( value );
+    value = APPLY_DIMMING( value );  // cppcheck-suppress selfAssignment
 
     // The brightness floor is minimum number that all of
     // R, G, and B will be set to, which is value * invsat
@@ -253,7 +233,7 @@ void hsv2rgb_raw_avr(const struct CHSV & hsv, struct CRGB & rgb)
 
 #endif
 
-void hsv2rgb_spectrum( const CHSV& hsv, CRGB& rgb)
+void hsv2rgb_spectrum( const struct CHSV& hsv, CRGB& rgb)
 {
     CHSV hsv2(hsv);
     hsv2.hue = scale8( hsv2.hue, 191);
@@ -261,19 +241,28 @@ void hsv2rgb_spectrum( const CHSV& hsv, CRGB& rgb)
 }
 
 
-// Sometimes the compiler will do clever things to reduce
-// code size that result in a net slowdown, if it thinks that
-// a variable is not used in a certain location.
-// This macro does its best to convince the compiler that
-// the variable is used in this location, to help control
-// code motion and de-duplication that would result in a slowdown.
+/// Force a variable reference to avoid compiler over-optimization.
+/// Sometimes the compiler will do clever things to reduce
+/// code size that result in a net slowdown, if it thinks that
+/// a variable is not used in a certain location.
+/// This macro does its best to convince the compiler that
+/// the variable is used in this location, to help control
+/// code motion and de-duplication that would result in a slowdown.
 #define FORCE_REFERENCE(var)  asm volatile( "" : : "r" (var) )
 
 
+/// @cond
 #define K255 255
 #define K171 171
 #define K170 170
 #define K85  85
+/// @endcond
+
+CRGB hsv2rgb_rainbow( const struct CHSV& hsv) {
+    CRGB rgb;
+    hsv2rgb_rainbow(hsv, rgb);
+    return rgb;
+}
 
 void hsv2rgb_rainbow( const CHSV& hsv, CRGB& rgb)
 {
@@ -287,22 +276,22 @@ void hsv2rgb_rainbow( const CHSV& hsv, CRGB& rgb)
     // Level Y2 is a strong boost.
     const uint8_t Y1 = 1;
     const uint8_t Y2 = 0;
-    
+
     // G2: Whether to divide all greens by two.
     // Depends GREATLY on your particular LEDs
     const uint8_t G2 = 0;
-    
+
     // Gscale: what to scale green down by.
     // Depends GREATLY on your particular LEDs
     const uint8_t Gscale = 0;
-    
-    
+
+
     uint8_t hue = hsv.hue;
     uint8_t sat = hsv.sat;
     uint8_t val = hsv.val;
-    
+
     uint8_t offset = hue & 0x1F; // 0..31
-    
+
     // offset8 = offset * 8
     uint8_t offset8 = offset;
     {
@@ -320,11 +309,11 @@ void hsv2rgb_rainbow( const CHSV& hsv, CRGB& rgb)
         offset8 <<= 3;
 #endif
     }
-    
+
     uint8_t third = scale8( offset8, (256 / 3)); // max = 85
-    
+
     uint8_t r, g, b;
-    
+
     if( ! (hue & 0x80) ) {
         // 0XX
         if( ! (hue & 0x40) ) {
@@ -398,7 +387,7 @@ void hsv2rgb_rainbow( const CHSV& hsv, CRGB& rgb)
                 uint8_t twothirds = scale8( offset8, ((256 * 2) / 3)); // max=170
                 g = K171 - twothirds; //K170?
                 b = K85  + twothirds;
-                
+
             } else {
                 // 101
                 //case 5: // B -> P
@@ -406,7 +395,7 @@ void hsv2rgb_rainbow( const CHSV& hsv, CRGB& rgb)
                 g = 0;
                 FORCE_REFERENCE(g);
                 b = K255 - third;
-                
+
             }
         } else {
             if( !  (hue & 0x20)  ) {
@@ -416,7 +405,7 @@ void hsv2rgb_rainbow( const CHSV& hsv, CRGB& rgb)
                 g = 0;
                 FORCE_REFERENCE(g);
                 b = K171 - third;
-                
+
             } else {
                 // 111
                 //case 7: // K -> R
@@ -424,16 +413,16 @@ void hsv2rgb_rainbow( const CHSV& hsv, CRGB& rgb)
                 g = 0;
                 FORCE_REFERENCE(g);
                 b = K85 - third;
-                
+
             }
         }
     }
-    
+
     // This is one of the good places to scale the green down,
     // although the client can scale green down as well.
     if( G2 ) g = g >> 1;
     if( Gscale ) g = scale8_video_LEAVING_R1_DIRTY( g, Gscale);
-    
+
     // Scale down colors if we're desaturated at all
     // and add the brightness_floor to r, g, and b.
     if( sat != 255 ) {
@@ -449,8 +438,11 @@ void hsv2rgb_rainbow( const CHSV& hsv, CRGB& rgb)
             //nscale8x3_video( r, g, b, sat);
 #if (FASTLED_SCALE8_FIXED==1)
             r = scale8_LEAVING_R1_DIRTY( r, satscale);
+            asm volatile("");  // Fixes jumping red pixel: https://github.com/FastLED/FastLED/pull/943
             g = scale8_LEAVING_R1_DIRTY( g, satscale);
+            asm volatile("");
             b = scale8_LEAVING_R1_DIRTY( b, satscale);
+            asm volatile("");
             cleanup_R1();
 #else
             if( r ) r = scale8( r, satscale) + 1;
@@ -463,10 +455,10 @@ void hsv2rgb_rainbow( const CHSV& hsv, CRGB& rgb)
             b += brightness_floor;
         }
     }
-    
+
     // Now scale everything down if we're at value < 255.
     if( val != 255 ) {
-        
+
         val = scale8_video_LEAVING_R1_DIRTY( val, val);
         if( val == 0 ) {
             r=0; g=0; b=0;
@@ -474,8 +466,11 @@ void hsv2rgb_rainbow( const CHSV& hsv, CRGB& rgb)
             // nscale8x3_video( r, g, b, val);
 #if (FASTLED_SCALE8_FIXED==1)
             r = scale8_LEAVING_R1_DIRTY( r, val);
+            asm volatile("");  // Fixes jumping red pixel: https://github.com/FastLED/FastLED/pull/943
             g = scale8_LEAVING_R1_DIRTY( g, val);
+            asm volatile("");
             b = scale8_LEAVING_R1_DIRTY( b, val);
+            asm volatile("");
             cleanup_R1();
 #else
             if( r ) r = scale8( r, val) + 1;
@@ -484,7 +479,7 @@ void hsv2rgb_rainbow( const CHSV& hsv, CRGB& rgb)
 #endif
         }
     }
-    
+
     // Here we have the old AVR "missing std X+n" problem again
     // It turns out that fixing it winds up costing more than
     // not fixing it.
@@ -494,6 +489,31 @@ void hsv2rgb_rainbow( const CHSV& hsv, CRGB& rgb)
     rgb.r = r;
     rgb.g = g;
     rgb.b = b;
+}
+
+void hsv2rgb_fullspectrum( const struct CHSV& hsv, CRGB& rgb) {
+  const auto f = [](const int n, const uint8_t h) -> unsigned int {
+    constexpr int kZero = 0 << 8;
+    constexpr int kOne  = 1 << 8;
+    constexpr int kFour = 4 << 8;
+    constexpr int kSix  = 6 << 8;
+
+    const int k = ((n << 8) + 6*h) % kSix;
+    const int k2 = kFour - k;
+    return fl::fl_max(kZero, fl::fl_min(kOne, fl::fl_min(k, k2)));
+  };
+
+  const unsigned int chroma = hsv.v * hsv.s / 255;
+  rgb.r = hsv.v - ((chroma * f(5, hsv.h)) >> 8);
+  rgb.g = hsv.v - ((chroma * f(3, hsv.h)) >> 8);
+  rgb.b = hsv.v - ((chroma * f(1, hsv.h)) >> 8);
+}
+
+/// Inline version of hsv2rgb_fullspectrum which returns a CRGB object.
+CRGB hsv2rgb_fullspectrum( const struct CHSV& hsv) {
+    CRGB rgb;
+    hsv2rgb_fullspectrum(hsv, rgb);
+    return rgb;
 }
 
 
@@ -515,8 +535,13 @@ void hsv2rgb_spectrum( const struct CHSV* phsv, struct CRGB * prgb, int numLeds)
     }
 }
 
+void hsv2rgb_fullspectrum( const struct CHSV* phsv, struct CRGB * prgb, int numLeds) {
+    for (int i = 0; i < numLeds; ++i) {
+        hsv2rgb_fullspectrum(phsv[i], prgb[i]);
+    }
+}
 
-
+/// Convert a fractional input into a constant
 #define FIXFRAC8(N,D) (((N)*256)/(D))
 
 // This function is only an approximation, and it is not
@@ -528,27 +553,27 @@ CHSV rgb2hsv_approximate( const CRGB& rgb)
     uint8_t g = rgb.g;
     uint8_t b = rgb.b;
     uint8_t h, s, v;
-    
+
     // find desaturation
     uint8_t desat = 255;
     if( r < desat) desat = r;
     if( g < desat) desat = g;
     if( b < desat) desat = b;
-    
+
     // remove saturation from all channels
     r -= desat;
     g -= desat;
     b -= desat;
-    
+
     //Serial.print("desat="); Serial.print(desat); Serial.println("");
-    
+
     //uint8_t orig_desat = sqrt16( desat * 256);
     //Serial.print("orig_desat="); Serial.print(orig_desat); Serial.println("");
-    
+
     // saturation is opposite of desaturation
     s = 255 - desat;
     //Serial.print("s.1="); Serial.print(s); Serial.println("");
-    
+
     if( s != 255 ) {
         // undo 'dimming' of saturation
         s = 255 - sqrt16( (255-s) * 256);
@@ -556,8 +581,8 @@ CHSV rgb2hsv_approximate( const CRGB& rgb)
     // without lib8tion: float ... ew ... sqrt... double ew, or rather, ew ^ 0.5
     // if( s != 255 ) s = (255 - (256.0 * sqrt( (float)(255-s) / 256.0)));
     //Serial.print("s.2="); Serial.print(s); Serial.println("");
-    
-    
+
+
     // at least one channel is now zero
     // if all three channels are zero, we had a
     // shade of gray.
@@ -565,7 +590,7 @@ CHSV rgb2hsv_approximate( const CRGB& rgb)
         // we pick hue zero for no special reason
         return CHSV( 0, 0, 255 - s);
     }
-    
+
     // scale all channels up to compensate for desaturation
     if( s < 255) {
         if( s == 0) s = 1;
@@ -577,11 +602,11 @@ CHSV rgb2hsv_approximate( const CRGB& rgb)
     //Serial.print("r.2="); Serial.print(r); Serial.println("");
     //Serial.print("g.2="); Serial.print(g); Serial.println("");
     //Serial.print("b.2="); Serial.print(b); Serial.println("");
-    
+
     uint16_t total = r + g + b;
-    
+
     //Serial.print("total="); Serial.print(total); Serial.println("");
-    
+
     // scale all channels up to compensate for low values
     if( total < 255) {
         if( total == 0) total = 1;
@@ -593,7 +618,7 @@ CHSV rgb2hsv_approximate( const CRGB& rgb)
     //Serial.print("r.3="); Serial.print(r); Serial.println("");
     //Serial.print("g.3="); Serial.print(g); Serial.println("");
     //Serial.print("b.3="); Serial.print(b); Serial.println("");
-    
+
     if( total > 255 ) {
         v = 255;
     } else {
@@ -602,14 +627,14 @@ CHSV rgb2hsv_approximate( const CRGB& rgb)
         if( v != 255) v = sqrt16( v * 256);
         // without lib8tion: float ... ew ... sqrt... double ew, or rather, ew ^ 0.5
         // if( v != 255) v = (256.0 * sqrt( (float)(v) / 256.0));
-        
+
     }
-    
+
     //Serial.print("v="); Serial.print(v); Serial.println("");
-    
-    
+
+
 #if 0
-    
+
     //#else
     if( v != 255) {
         // this part could probably use refinement/rethinking,
@@ -625,21 +650,21 @@ CHSV rgb2hsv_approximate( const CRGB& rgb)
         }
     }
 #endif
-    
+
     //Serial.print("s.3="); Serial.print(s); Serial.println("");
-    
-    
+
+
     // since this wasn't a pure shade of gray,
     // the interesting question is what hue is it
-    
-    
-    
+
+
+
     // start with which channel is highest
     // (ties don't matter)
     uint8_t highest = r;
     if( g > highest) highest = g;
     if( b > highest) highest = b;
-    
+
     if( highest == r ) {
         // Red is highest.
         // Hue could be Purple/Pink-Red,Red-Orange,Orange-Yellow
@@ -656,7 +681,7 @@ CHSV rgb2hsv_approximate( const CRGB& rgb)
             h = HUE_ORANGE;
             h += scale8( qsub8((g - 85) + (171 - r), 4), FIXFRAC8(32,85)); //221
         }
-        
+
     } else if ( highest == g) {
         // Green is highest
         // Hue could be Yellow-Green, Green-Aqua
@@ -682,7 +707,7 @@ CHSV rgb2hsv_approximate( const CRGB& rgb)
                 h += scale8( qsub8(b, 85), FIXFRAC8(8,42));
             }
         }
-        
+
     } else /* highest == b */ {
         // Blue is highest
         // Hue could be Aqua/Blue-Blue, Blue-Purple, Purple-Pink
@@ -700,7 +725,7 @@ CHSV rgb2hsv_approximate( const CRGB& rgb)
             h += scale8( qsub8(r, 85), FIXFRAC8(32,85));
         }
     }
-    
+
     h += 1;
     return CHSV( h, s, v);
 }

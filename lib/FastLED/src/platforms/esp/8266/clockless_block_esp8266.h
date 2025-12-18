@@ -1,11 +1,20 @@
 #ifndef __INC_CLOCKLESS_BLOCK_ESP8266_H
 #define __INC_CLOCKLESS_BLOCK_ESP8266_H
 
+#include "fl/stdint.h"
+#include "fl/namespace.h"
+#include "fl/register.h"
+#include "eorder.h"
+#include "transpose8x1_noinline.h"
+
 #define FASTLED_HAS_BLOCKLESS 1
 
 #define FIX_BITS(bits) (((bits & 0x0fL) << 12) | (bits & 0x30))
 
+#ifndef MIN
 #define MIN(X,Y) (((X)<(Y)) ? (X):(Y))
+#endif
+
 #define USED_LANES (MIN(LANES, 6))
 #define PORT_MASK (((1 << USED_LANES)-1) & 0x0000FFFFL)
 #define PIN_MASK FIX_BITS(PORT_MASK)
@@ -17,7 +26,7 @@ extern uint32_t _frame_cnt;
 extern uint32_t _retry_cnt;
 #endif
 
-template <uint8_t LANES, int FIRST_PIN, int T1, int T2, int T3, EOrder RGB_ORDER = GRB, int XTRA0 = 0, bool FLIP = false, int WAIT_TIME = 50>
+template <uint8_t LANES, int FIRST_PIN, int T1, int T2, int T3, EOrder RGB_ORDER = GRB, int XTRA0 = 0, bool FLIP = false, int WAIT_TIME = 280>
 class InlineBlockClocklessController : public CPixelLEDController<RGB_ORDER, LANES, PORT_MASK> {
 	typedef typename FastPin<FIRST_PIN>::port_ptr_t data_ptr_t;
 	typedef typename FastPin<FIRST_PIN>::port_t data_t;
@@ -70,14 +79,14 @@ public:
 
 #define ESP_ADJUST 0 // (2*(F_CPU/24000000))
 #define ESP_ADJUST2 0
-  	template<int BITS,int PX> __attribute__ ((always_inline)) inline static void writeBits(register uint32_t & last_mark, register Lines & b, PixelController<RGB_ORDER, LANES, PORT_MASK> &pixels) { // , register uint32_t & b2)  {
+  	template<int BITS,int PX> __attribute__ ((always_inline)) inline static void writeBits(FASTLED_REGISTER uint32_t & last_mark, FASTLED_REGISTER Lines & b, PixelController<RGB_ORDER, LANES, PORT_MASK> &pixels) { // , FASTLED_REGISTER uint32_t & b2)  {
 	  	Lines b2 = b;
 		transpose8x1_noinline(b.bytes,b2.bytes);
 
-		register uint8_t d = pixels.template getd<PX>(pixels);
-		register uint8_t scale = pixels.template getscale<PX>(pixels);
+		FASTLED_REGISTER uint8_t d = pixels.template getd<PX>(pixels);
+		FASTLED_REGISTER uint8_t scale = pixels.template getscale<PX>(pixels);
 
-		for(register uint32_t i = 0; i < USED_LANES; ++i) {
+		for(FASTLED_REGISTER uint32_t i = 0; i < USED_LANES; ++i) {
 			while((__clock_cycles() - last_mark) < (T1+T2+T3));
 			last_mark = __clock_cycles();
 			*FastPin<FIRST_PIN>::sport() = PIN_MASK;
@@ -92,7 +101,7 @@ public:
 			b.bytes[i] = pixels.template loadAndScale<PX>(pixels,i,d,scale);
 		}
 
-		for(register uint32_t i = USED_LANES; i < 8; ++i) {
+		for(FASTLED_REGISTER uint32_t i = USED_LANES; i < 8; ++i) {
 			while((__clock_cycles() - last_mark) < (T1+T2+T3));
 			last_mark = __clock_cycles();
 			*FastPin<FIRST_PIN>::sport() = PIN_MASK;
@@ -108,7 +117,7 @@ public:
 
   	// This method is made static to force making register Y available to use for data on AVR - if the method is non-static, then
 	// gcc will use register Y for the this pointer.
-	static uint32_t ICACHE_RAM_ATTR showRGBInternal(PixelController<RGB_ORDER, LANES, PORT_MASK> &allpixels) {
+	static uint32_t IRAM_ATTR showRGBInternal(PixelController<RGB_ORDER, LANES, PORT_MASK> &allpixels) {
 
 		// Setup the pixel controller and load/scale the first byte
 		Lines b0;

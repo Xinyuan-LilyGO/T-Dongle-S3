@@ -1,5 +1,5 @@
 #include "../lv_examples.h"
-#if LV_BUILD_EXAMPLES && LV_USE_IMG
+#if LV_BUILD_EXAMPLES && LV_USE_IMAGE
 
 /**
  * Add styles to parts and states
@@ -19,7 +19,7 @@ void lv_example_style_13(void)
     lv_style_set_shadow_spread(&style_indic_pr, 3);
 
     /*Create an object with the new style_pr*/
-    lv_obj_t * obj = lv_slider_create(lv_scr_act());
+    lv_obj_t * obj = lv_slider_create(lv_screen_active());
     lv_obj_add_style(obj, &style_indic, LV_PART_INDICATOR);
     lv_obj_add_style(obj, &style_indic_pr, LV_PART_INDICATOR | LV_STATE_PRESSED);
     lv_slider_set_value(obj, 70, LV_ANIM_OFF);

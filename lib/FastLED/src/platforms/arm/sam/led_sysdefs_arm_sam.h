@@ -2,7 +2,14 @@
 #define __INC_LED_SYSDEFS_ARM_SAM_H
 
 
-#define FASTLED_ARM
+#ifndef FASTLED_ARM
+#error "FASTLED_ARM must be defined before including this header. Ensure platforms/arm/is_arm.h is included first."
+#endif
+
+// SAM platforms don't use PROGMEM
+#ifndef FASTLED_USE_PROGMEM
+#define FASTLED_USE_PROGMEM 0
+#endif
 
 // Setup DUE timer defines/channels/etc...
 #ifndef DUE_TIMER_CHANNEL

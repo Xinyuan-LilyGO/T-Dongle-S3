@@ -1,10 +1,33 @@
+/// @file noise.cpp
+/// Functions to generate and fill arrays with noise.
+
+#include <string.h>
+#include "fl/array.h"
+
+
+/// Disables pragma messages and warnings
 #define FASTLED_INTERNAL
 #include "FastLED.h"
-#include <string.h>
+
+
+#include "fl/memfill.h"
+// Compiler throws a warning about stack usage possibly being unbounded even
+// though bounds are checked, silence that so users don't see it
+#pragma GCC diagnostic push
+#if defined(__GNUC__) && (__GNUC__ >= 6)
+  #pragma GCC diagnostic ignored "-Wstack-usage="
+#else
+  #pragma GCC diagnostic ignored "-Wunknown-warning-option"
+#endif
+
+
+
+/// Reads a single byte from the p array
+#define NOISE_P(x) FL_PGM_READ_BYTE_NEAR(noise_detail::p + x)
 
 FASTLED_NAMESPACE_BEGIN
 
-#define P(x) FL_PGM_READ_BYTE_NEAR(p + x)
+namespace noise_detail {
 
 FL_PROGMEM static uint8_t const p[] = {
     151, 160, 137,  91,  90,  15, 131,  13, 201,  95,  96,  53, 194, 233,   7, 225,
@@ -25,12 +48,16 @@ FL_PROGMEM static uint8_t const p[] = {
     222, 114,  67,  29,  24,  72, 243, 141, 128, 195,  78,  66, 215,  61, 156, 180,
     151};
 
+
+// Start Doxygen define hiding
+/// @cond
+
 #if FASTLED_NOISE_ALLOW_AVERAGE_TO_OVERFLOW == 1
 #define AVG15(U,V) (((U)+(V)) >> 1)
 #else
 // See if we should use the inlined avg15 for AVR with MUL instruction
 #if defined(__AVR__) && (LIB8_ATTINY == 0)
-#define AVG15(U,V) (avg15_inline_avr_mul((U),(V)))
+#define AVG15(U,V) (noise_detail::avg15_inline_avr_mul((U),(V)))
 // inlined copy of avg15 for AVR with MUL instruction; cloned from math8.h
 // Forcing this inline in the 3-D 16bit noise produces a 12% speedup overall,
 // at a cost of just +8 bytes of net code size.
@@ -46,8 +73,8 @@ static int16_t inline __attribute__((always_inline))  avg15_inline_avr_mul( int1
                  /* add j + C to i */
                  "adc %A[i], %A[j]   \n\t"
                  "adc %B[i], %B[j]   \n\t"
-                 : [i] "+a" (i)
-                 : [j] "a"  (j) );
+                 : [i] "+r" (i)
+                 : [j] "r"  (j) );
     return i;
 }
 #else
@@ -75,6 +102,12 @@ static int16_t inline __attribute__((always_inline))  avg15_inline_avr_mul( int1
 #define FADE(x) scale16(x,x)
 #define LERP(a,b,u) lerp15by16(a,b,u)
 #endif
+
+// end Doxygen define hiding
+/// @endcond
+
+} // namespace noise_detail
+
 static int16_t inline __attribute__((always_inline))  grad16(uint8_t hash, int16_t x, int16_t y, int16_t z) {
 #if 0
     switch(hash & 0xF) {
@@ -132,7 +165,7 @@ static int16_t inline __attribute__((always_inline)) grad16(uint8_t hash, int16_
 //   result = (hash & (1<<bitnumber)) ? a : b
 // but with an AVR asm version that's smaller and quicker than C
 // (and probably not worth including in lib8tion)
-static int8_t inline __attribute__((always_inline)) selectBasedOnHashBit(uint8_t hash, uint8_t bitnumber, int8_t a, int8_t b) {
+static int8_t inline __attribute__((always_inline)) __attribute__((unused)) selectBasedOnHashBit(uint8_t hash, uint8_t bitnumber, int8_t a, int8_t b) {
 	int8_t result;
 #if !defined(__AVR__)
 	result = (hash & (1<<bitnumber)) ? a : b;
@@ -152,53 +185,29 @@ static int8_t inline __attribute__((always_inline)) selectBasedOnHashBit(uint8_t
 }
 
 static int8_t  inline __attribute__((always_inline)) grad8(uint8_t hash, int8_t x, int8_t y, int8_t z) {
-#if 0
+    // Industry-standard 3D Perlin noise gradient implementation
+    // Uses proper 12 edge vectors of a cube for maximum range coverage
+    
     switch(hash & 0xF) {
-        case  0: return (( x) + ( y))>>1;
-        case  1: return ((-x) + ( y))>>1;
-        case  2: return (( x) + (-y))>>1;
-        case  3: return ((-x) + (-y))>>1;
-        case  4: return (( x) + ( z))>>1;
-        case  5: return ((-x) + ( z))>>1;
-        case  6: return (( x) + (-z))>>1;
-        case  7: return ((-x) + (-z))>>1;
-        case  8: return (( y) + ( z))>>1;
-        case  9: return ((-y) + ( z))>>1;
-        case 10: return (( y) + (-z))>>1;
-        case 11: return ((-y) + (-z))>>1;
-        case 12: return (( y) + ( x))>>1;
-        case 13: return ((-y) + ( z))>>1;
-        case 14: return (( y) + (-x))>>1;
-        case 15: return ((-y) + (-z))>>1;
+        case  0: return avg7( x,  y);  // (1,1,0)
+        case  1: return avg7(-x,  y);  // (-1,1,0)
+        case  2: return avg7( x, -y);  // (1,-1,0)
+        case  3: return avg7(-x, -y);  // (-1,-1,0)
+        case  4: return avg7( x,  z);  // (1,0,1)
+        case  5: return avg7(-x,  z);  // (-1,0,1)
+        case  6: return avg7( x, -z);  // (1,0,-1)
+        case  7: return avg7(-x, -z);  // (-1,0,-1)
+        case  8: return avg7( y,  z);  // (0,1,1)
+        case  9: return avg7(-y,  z);  // (0,-1,1)
+        case 10: return avg7( y, -z);  // (0,1,-1)
+        case 11: return avg7(-y, -z);  // (0,-1,-1)
+        // Repeat first 4 for hash values 12-15 (proper wrap-around)
+        case 12: return avg7( x,  y);  // (1,1,0)
+        case 13: return avg7(-x,  y);  // (-1,1,0)
+        case 14: return avg7( x, -y);  // (1,-1,0)
+        case 15: return avg7(-x, -y);  // (-1,-1,0)
     }
-#else
-
-    hash &= 0xF;
-
-    int8_t u, v;
-    //u = (hash&8)?y:x;
-    u = selectBasedOnHashBit( hash, 3, y, x);
-
-#if 1
-    v = hash<4?y:hash==12||hash==14?x:z;
-#else
-    // Verbose version for analysis; generates idenitical code.
-    if( hash < 4) { // 00 01 02 03
-        v = y;
-    } else {
-        if( hash==12 || hash==14) { // 0C 0E
-            v = x;
-        } else {
-            v = z; // 04 05 06 07   08 09 0A 0B   0D  0F
-        }
-    }
-#endif
-
-    if(hash&1) { u = -u; }
-    if(hash&2) { v = -v; }
-
-    return avg7(u,v);
-#endif
+    return 0; // Should never reach here
 }
 
 static int8_t inline __attribute__((always_inline)) grad8(uint8_t hash, int8_t x, int8_t y)
@@ -294,12 +303,12 @@ int16_t inoise16_raw(uint32_t x, uint32_t y, uint32_t z)
     uint8_t Z = (z>>16)&0xFF;
 
     // Hash cube corner coordinates
-    uint8_t A = P(X)+Y;
-    uint8_t AA = P(A)+Z;
-    uint8_t AB = P(A+1)+Z;
-    uint8_t B = P(X+1)+Y;
-    uint8_t BA = P(B) + Z;
-    uint8_t BB = P(B+1)+Z;
+    uint8_t A = NOISE_P(X)+Y;
+    uint8_t AA = NOISE_P(A)+Z;
+    uint8_t AB = NOISE_P(A+1)+Z;
+    uint8_t B = NOISE_P(X+1)+Y;
+    uint8_t BA = NOISE_P(B) + Z;
+    uint8_t BB = NOISE_P(B+1)+Z;
 
     // Get the relative position of the point in the cube
     uint16_t u = x & 0xFFFF;
@@ -316,10 +325,10 @@ int16_t inoise16_raw(uint32_t x, uint32_t y, uint32_t z)
 
     // skip the log fade adjustment for the moment, otherwise here we would
     // adjust fade values for u,v,w
-    int16_t X1 = LERP(grad16(P(AA), xx, yy, zz), grad16(P(BA), xx - N, yy, zz), u);
-    int16_t X2 = LERP(grad16(P(AB), xx, yy-N, zz), grad16(P(BB), xx - N, yy - N, zz), u);
-    int16_t X3 = LERP(grad16(P(AA+1), xx, yy, zz-N), grad16(P(BA+1), xx - N, yy, zz-N), u);
-    int16_t X4 = LERP(grad16(P(AB+1), xx, yy-N, zz-N), grad16(P(BB+1), xx - N, yy - N, zz - N), u);
+    int16_t X1 = LERP(grad16(NOISE_P(AA), xx, yy, zz), grad16(NOISE_P(BA), xx - N, yy, zz), u);
+    int16_t X2 = LERP(grad16(NOISE_P(AB), xx, yy-N, zz), grad16(NOISE_P(BB), xx - N, yy - N, zz), u);
+    int16_t X3 = LERP(grad16(NOISE_P(AA+1), xx, yy, zz-N), grad16(NOISE_P(BA+1), xx - N, yy, zz-N), u);
+    int16_t X4 = LERP(grad16(NOISE_P(AB+1), xx, yy-N, zz-N), grad16(NOISE_P(BB+1), xx - N, yy - N, zz - N), u);
 
     int16_t Y1 = LERP(X1,X2,v);
     int16_t Y2 = LERP(X3,X4,v);
@@ -327,6 +336,101 @@ int16_t inoise16_raw(uint32_t x, uint32_t y, uint32_t z)
     int16_t ans = LERP(Y1,Y2,w);
 
     return ans;
+}
+
+int16_t inoise16_raw(uint32_t x, uint32_t y, uint32_t z, uint32_t t) {
+    // 1. Extract the integer (grid) parts.
+    uint8_t X = (x >> 16) & 0xFF;
+    uint8_t Y = (y >> 16) & 0xFF;
+    uint8_t Z = (z >> 16) & 0xFF;
+    uint8_t T = (t >> 16) & 0xFF;
+
+    // 2. Extract the fractional parts.
+    uint16_t u = x & 0xFFFF;
+    uint16_t v = y & 0xFFFF;
+    uint16_t w = z & 0xFFFF;
+    uint16_t s = t & 0xFFFF;
+
+    // 3. Easing of the fractional parts.
+    u = EASE16(u);
+    v = EASE16(v);
+    w = EASE16(w);
+    s = EASE16(s);
+
+    uint16_t N = 0x8000L; // fixed-point half-scale
+
+    // 4. Precompute fixed-point versions for the gradient evaluations.
+    int16_t xx = (u >> 1) & 0x7FFF;
+    int16_t yy = (v >> 1) & 0x7FFF;
+    int16_t zz = (w >> 1) & 0x7FFF;
+
+    // 5. Hash the 3D cube corners (the “base” for both t slices).
+    uint8_t A = NOISE_P(X) + Y;
+    uint8_t AA = NOISE_P(A) + Z;
+    uint8_t AB = NOISE_P(A + 1) + Z;
+    uint8_t B = NOISE_P(X + 1) + Y;
+    uint8_t BA = NOISE_P(B) + Z;
+    uint8_t BB = NOISE_P(B + 1) + Z;
+
+    // 6. --- Lower t Slice (using T) ---
+    uint8_t AAA = NOISE_P(AA) + T;
+    uint8_t AAB = NOISE_P(AA + 1) + T;
+    uint8_t ABA = NOISE_P(AB) + T;
+    uint8_t ABB = NOISE_P(AB + 1) + T;
+    uint8_t BAA = NOISE_P(BA) + T;
+    uint8_t BAB = NOISE_P(BA + 1) + T;
+    uint8_t BBA = NOISE_P(BB) + T;
+    uint8_t BBB = NOISE_P(BB + 1) + T;
+
+    int16_t L1 = LERP(grad16(AAA, xx, yy, zz),     grad16(BAA, xx - N, yy, zz), u);
+    int16_t L2 = LERP(grad16(ABA, xx, yy - N, zz),  grad16(BBA, xx - N, yy - N, zz), u);
+    int16_t L3 = LERP(grad16(AAB, xx, yy, zz - N),  grad16(BAB, xx - N, yy, zz - N), u);
+    int16_t L4 = LERP(grad16(ABB, xx, yy - N, zz - N),  grad16(BBB, xx - N, yy - N, zz - N), u);
+
+    int16_t Y1 = LERP(L1, L2, v);
+    int16_t Y2 = LERP(L3, L4, v);
+    int16_t noise_lower = LERP(Y1, Y2, w);
+
+    // 7. --- Upper t Slice (using T+1) ---
+    uint8_t Tupper = T + 1;
+    uint8_t AAA_u = NOISE_P(AA) + Tupper;
+    uint8_t AAB_u = NOISE_P(AA + 1) + Tupper;
+    uint8_t ABA_u = NOISE_P(AB) + Tupper;
+    uint8_t ABB_u = NOISE_P(AB + 1) + Tupper;
+    uint8_t BAA_u = NOISE_P(BA) + Tupper;
+    uint8_t BAB_u = NOISE_P(BA + 1) + Tupper;
+    uint8_t BBA_u = NOISE_P(BB) + Tupper;
+    uint8_t BBB_u = NOISE_P(BB + 1) + Tupper;
+
+    int16_t U1 = LERP(grad16(AAA_u, xx, yy, zz),     grad16(BAA_u, xx - N, yy, zz), u);
+    int16_t U2 = LERP(grad16(ABA_u, xx, yy - N, zz),  grad16(BBA_u, xx - N, yy - N, zz), u);
+    int16_t U3 = LERP(grad16(AAB_u, xx, yy, zz - N),  grad16(BAB_u, xx - N, yy, zz - N), u);
+    int16_t U4 = LERP(grad16(ABB_u, xx, yy - N, zz - N),  grad16(BBB_u, xx - N, yy - N, zz - N), u);
+
+    int16_t V1 = LERP(U1, U2, v);
+    int16_t V2 = LERP(U3, U4, v);
+    int16_t noise_upper = LERP(V1, V2, w);
+
+    // 8. Final interpolation in the t dimension.
+    int16_t noise4d = LERP(noise_lower, noise_upper, s);
+
+    return noise4d;
+}
+
+uint16_t inoise16(uint32_t x, uint32_t y, uint32_t z, uint32_t t) {
+    int32_t ans = inoise16_raw(x,y,z,t);
+    ans = ans + 19052L;
+    uint32_t pan = ans;
+    // pan = (ans * 220L) >> 7.  That's the same as:
+    // pan = (ans * 440L) >> 8.  And this way avoids a 7X four-byte shift-loop on AVR.
+    // Identical math, except for the highest bit, which we don't care about anyway,
+    // since we're returning the 'middle' 16 out of a 32-bit value anyway.
+    pan *= 440L;
+    return (pan>>8);
+
+    // return scale16by8(pan,220)<<1;
+    // return ((inoise16_raw(x,y,z)+19052)*220)>>7;
+    // return scale16by8(inoise16_raw(x,y,z)+19052,220)<<1;
 }
 
 uint16_t inoise16(uint32_t x, uint32_t y, uint32_t z) {
@@ -352,12 +456,12 @@ int16_t inoise16_raw(uint32_t x, uint32_t y)
     uint8_t Y = y>>16;
 
     // Hash cube corner coordinates
-    uint8_t A = P(X)+Y;
-    uint8_t AA = P(A);
-    uint8_t AB = P(A+1);
-    uint8_t B = P(X+1)+Y;
-    uint8_t BA = P(B);
-    uint8_t BB = P(B+1);
+    uint8_t A = NOISE_P(X)+Y;
+    uint8_t AA = NOISE_P(A);
+    uint8_t AB = NOISE_P(A+1);
+    uint8_t B = NOISE_P(X+1)+Y;
+    uint8_t BA = NOISE_P(B);
+    uint8_t BB = NOISE_P(B+1);
 
     // Get the relative position of the point in the cube
     uint16_t u = x & 0xFFFF;
@@ -370,8 +474,8 @@ int16_t inoise16_raw(uint32_t x, uint32_t y)
 
     u = EASE16(u); v = EASE16(v);
 
-    int16_t X1 = LERP(grad16(P(AA), xx, yy), grad16(P(BA), xx - N, yy), u);
-    int16_t X2 = LERP(grad16(P(AB), xx, yy-N), grad16(P(BB), xx - N, yy - N), u);
+    int16_t X1 = LERP(grad16(NOISE_P(AA), xx, yy), grad16(NOISE_P(BA), xx - N, yy), u);
+    int16_t X2 = LERP(grad16(NOISE_P(AB), xx, yy-N), grad16(NOISE_P(BB), xx - N, yy - N), u);
 
     int16_t ans = LERP(X1,X2,v);
 
@@ -399,10 +503,10 @@ int16_t inoise16_raw(uint32_t x)
     uint8_t X = x>>16;
 
     // Hash cube corner coordinates
-    uint8_t A = P(X);
-    uint8_t AA = P(A);
-    uint8_t B = P(X+1);
-    uint8_t BA = P(B);
+    uint8_t A = NOISE_P(X);
+    uint8_t AA = NOISE_P(A);
+    uint8_t B = NOISE_P(X+1);
+    uint8_t BA = NOISE_P(B);
 
     // Get the relative position of the point in the cube
     uint16_t u = x & 0xFFFF;
@@ -413,7 +517,7 @@ int16_t inoise16_raw(uint32_t x)
 
     u = EASE16(u);
 
-    int16_t ans = LERP(grad16(P(AA), xx), grad16(P(BA), xx - N), u);
+    int16_t ans = LERP(grad16(NOISE_P(AA), xx), grad16(NOISE_P(BA), xx - N), u);
 
     return ans;
 }
@@ -430,12 +534,12 @@ int8_t inoise8_raw(uint16_t x, uint16_t y, uint16_t z)
     uint8_t Z = z>>8;
 
     // Hash cube corner coordinates
-    uint8_t A = P(X)+Y;
-    uint8_t AA = P(A)+Z;
-    uint8_t AB = P(A+1)+Z;
-    uint8_t B = P(X+1)+Y;
-    uint8_t BA = P(B) + Z;
-    uint8_t BB = P(B+1)+Z;
+    uint8_t A = NOISE_P(X)+Y;
+    uint8_t AA = NOISE_P(A)+Z;
+    uint8_t AB = NOISE_P(A+1)+Z;
+    uint8_t B = NOISE_P(X+1)+Y;
+    uint8_t BA = NOISE_P(B) + Z;
+    uint8_t BB = NOISE_P(B+1)+Z;
 
     // Get the relative position of the point in the cube
     uint8_t u = x;
@@ -450,10 +554,10 @@ int8_t inoise8_raw(uint16_t x, uint16_t y, uint16_t z)
 
     u = EASE8(u); v = EASE8(v); w = EASE8(w);
 
-    int8_t X1 = lerp7by8(grad8(P(AA), xx, yy, zz), grad8(P(BA), xx - N, yy, zz), u);
-    int8_t X2 = lerp7by8(grad8(P(AB), xx, yy-N, zz), grad8(P(BB), xx - N, yy - N, zz), u);
-    int8_t X3 = lerp7by8(grad8(P(AA+1), xx, yy, zz-N), grad8(P(BA+1), xx - N, yy, zz-N), u);
-    int8_t X4 = lerp7by8(grad8(P(AB+1), xx, yy-N, zz-N), grad8(P(BB+1), xx - N, yy - N, zz - N), u);
+    int8_t X1 = lerp7by8(grad8(NOISE_P(AA), xx, yy, zz), grad8(NOISE_P(BA), xx - N, yy, zz), u);
+    int8_t X2 = lerp7by8(grad8(NOISE_P(AB), xx, yy-N, zz), grad8(NOISE_P(BB), xx - N, yy - N, zz), u);
+    int8_t X3 = lerp7by8(grad8(NOISE_P(AA+1), xx, yy, zz-N), grad8(NOISE_P(BA+1), xx - N, yy, zz-N), u);
+    int8_t X4 = lerp7by8(grad8(NOISE_P(AB+1), xx, yy-N, zz-N), grad8(NOISE_P(BB+1), xx - N, yy - N, zz - N), u);
 
     int8_t Y1 = lerp7by8(X1,X2,v);
     int8_t Y2 = lerp7by8(X3,X4,v);
@@ -478,12 +582,12 @@ int8_t inoise8_raw(uint16_t x, uint16_t y)
     uint8_t Y = y>>8;
 
     // Hash cube corner coordinates
-    uint8_t A = P(X)+Y;
-    uint8_t AA = P(A);
-    uint8_t AB = P(A+1);
-    uint8_t B = P(X+1)+Y;
-    uint8_t BA = P(B);
-    uint8_t BB = P(B+1);
+    uint8_t A = NOISE_P(X)+Y;
+    uint8_t AA = NOISE_P(A);
+    uint8_t AB = NOISE_P(A+1);
+    uint8_t B = NOISE_P(X+1)+Y;
+    uint8_t BA = NOISE_P(B);
+    uint8_t BB = NOISE_P(B+1);
 
     // Get the relative position of the point in the cube
     uint8_t u = x;
@@ -496,8 +600,8 @@ int8_t inoise8_raw(uint16_t x, uint16_t y)
 
     u = EASE8(u); v = EASE8(v);
 
-    int8_t X1 = lerp7by8(grad8(P(AA), xx, yy), grad8(P(BA), xx - N, yy), u);
-    int8_t X2 = lerp7by8(grad8(P(AB), xx, yy-N), grad8(P(BB), xx - N, yy - N), u);
+    int8_t X1 = lerp7by8(grad8(NOISE_P(AA), xx, yy), grad8(NOISE_P(BA), xx - N, yy), u);
+    int8_t X2 = lerp7by8(grad8(NOISE_P(AB), xx, yy-N), grad8(NOISE_P(BB), xx - N, yy - N), u);
 
     int8_t ans = lerp7by8(X1,X2,v);
 
@@ -522,10 +626,10 @@ int8_t inoise8_raw(uint16_t x)
   uint8_t X = x>>8;
 
   // Hash cube corner coordinates
-  uint8_t A = P(X);
-  uint8_t AA = P(A);
-  uint8_t B = P(X+1);
-  uint8_t BA = P(B);
+  uint8_t A = NOISE_P(X);
+  uint8_t AA = NOISE_P(A);
+  uint8_t B = NOISE_P(X+1);
+  uint8_t BA = NOISE_P(B);
 
   // Get the relative position of the point in the cube
   uint8_t u = x;
@@ -536,7 +640,7 @@ int8_t inoise8_raw(uint16_t x)
 
   u = EASE8( u);
   
-  int8_t ans = lerp7by8(grad8(P(AA), xx), grad8(P(BA), xx - N), u);
+  int8_t ans = lerp7by8(grad8(NOISE_P(AA), xx), grad8(NOISE_P(BA), xx - N), u);
 
   return ans;
 }
@@ -547,6 +651,7 @@ uint8_t inoise8(uint16_t x) {
     uint8_t ans = qadd8(n,n);     // 0..255
     return ans;
 }
+
 
 // struct q44 {
 //   uint8_t i:4;
@@ -591,7 +696,21 @@ void fill_raw_noise16into8(uint8_t *pData, uint8_t num_points, uint8_t octaves, 
   }
 }
 
-void fill_raw_2dnoise8(uint8_t *pData, int width, int height, uint8_t octaves, q44 freq44, fract8 amplitude, int skip, uint16_t x, int scalex, uint16_t y, int scaley, uint16_t time) {
+/// Fill a 2D 8-bit buffer with noise, using inoise8() 
+/// @param pData the array of data to fill with noise values
+/// @param width the width of the 2D buffer
+/// @param height the height of the 2D buffer
+/// @param octaves the number of octaves to use for noise. More octaves = more noise.
+/// @param freq44 starting octave frequency
+/// @param amplitude noise amplitude
+/// @param skip how many noise maps to skip over, incremented recursively per octave
+/// @param x x-axis coordinate on noise map (1D)
+/// @param scalex the scale (distance) between x points when filling in noise
+/// @param y y-axis coordinate on noise map (2D)
+/// @param scaley the scale (distance) between y points when filling in noise
+/// @param time the time position for the noise field
+/// @todo Why isn't this declared in the header (noise.h)?
+void fill_raw_2dnoise8(uint8_t *pData, int width, int height, uint8_t octaves, q44 freq44, fract8 amplitude, int skip, uint16_t x, int16_t scalex, uint16_t y, int16_t scaley, uint16_t time) {
   if(octaves > 1) {
     fill_raw_2dnoise8(pData, width, height, octaves-1, freq44, amplitude, skip+1, x*freq44, freq44 * scalex, y*freq44, freq44 * scaley, time);
   } else {
@@ -629,7 +748,7 @@ void fill_raw_2dnoise8(uint8_t *pData, int width, int height, uint8_t octaves, u
   fill_raw_2dnoise8(pData, width, height, octaves, q44(2,0), 128, 1, x, scalex, y, scaley, time);
 }
 
-void fill_raw_2dnoise16(uint16_t *pData, int width, int height, uint8_t octaves, q88 freq88, fract16 amplitude, int skip, uint32_t x, int scalex, uint32_t y, int scaley, uint32_t time) {
+void fill_raw_2dnoise16(uint16_t *pData, int width, int height, uint8_t octaves, q88 freq88, fract16 amplitude, int skip, uint32_t x, int32_t scalex, uint32_t y, int32_t scaley, uint32_t time) {
   if(octaves > 1) {
     fill_raw_2dnoise16(pData, width, height, octaves-1, freq88, amplitude, skip, x *freq88 , scalex *freq88, y * freq88, scaley * freq88, time);
   } else {
@@ -660,10 +779,14 @@ void fill_raw_2dnoise16(uint16_t *pData, int width, int height, uint8_t octaves,
   }
 }
 
+/// Unused
+/// @todo Remove?
 int32_t nmin=11111110;
+/// Unused
+/// @todo Remove?
 int32_t nmax=0;
 
-void fill_raw_2dnoise16into8(uint8_t *pData, int width, int height, uint8_t octaves, q44 freq44, fract8 amplitude, int skip, uint32_t x, int scalex, uint32_t y, int scaley, uint32_t time) {
+void fill_raw_2dnoise16into8(uint8_t *pData, int width, int height, uint8_t octaves, q44 freq44, fract8 amplitude, int skip, uint32_t x, int32_t scalex, uint32_t y, int32_t scaley, uint32_t time) {
   if(octaves > 1) {
     fill_raw_2dnoise16into8(pData, width, height, octaves-1, freq44, amplitude, skip+1, x*freq44, scalex *freq44, y*freq44, scaley * freq44, time);
   } else {
@@ -704,46 +827,65 @@ void fill_noise8(CRGB *leds, int num_leds,
             uint8_t octaves, uint16_t x, int scale,
             uint8_t hue_octaves, uint16_t hue_x, int hue_scale,
             uint16_t time) {
-  uint8_t V[num_leds];
-  uint8_t H[num_leds];
 
-  memset(V,0,num_leds);
-  memset(H,0,num_leds);
+    if (num_leds <= 0) return;
 
-  fill_raw_noise8(V,num_leds,octaves,x,scale,time);
-  fill_raw_noise8(H,num_leds,hue_octaves,hue_x,hue_scale,time);
+    for (int j = 0; j < num_leds; j += 255) {
+        const int LedsRemaining = num_leds - j;
+        const int LedsPer = LedsRemaining > 255 ? 255 : LedsRemaining;  // limit to 255 max
 
-  for(int i = 0; i < num_leds; ++i) {
-    leds[i] = CHSV(H[i],255,V[i]);
-  }
+        if (LedsPer <= 0) continue;
+        FASTLED_STACK_ARRAY(uint8_t, V, LedsPer);
+        FASTLED_STACK_ARRAY(uint8_t, H, LedsPer);
+
+        fl::memfill(V, 0, LedsPer);
+        fl::memfill(H, 0, LedsPer);
+
+        fill_raw_noise8(V, LedsPer, octaves, x, scale, time);
+        fill_raw_noise8(H, LedsPer, hue_octaves, hue_x, hue_scale, time);
+
+        for (int i = 0; i < LedsPer; ++i) {
+            leds[i + j] = CHSV(H[i], 255, V[i]);
+        }
+    }
 }
 
 void fill_noise16(CRGB *leds, int num_leds,
             uint8_t octaves, uint16_t x, int scale,
             uint8_t hue_octaves, uint16_t hue_x, int hue_scale,
             uint16_t time, uint8_t hue_shift) {
-  uint8_t V[num_leds];
-  uint8_t H[num_leds];
 
-  memset(V,0,num_leds);
-  memset(H,0,num_leds);
+    if (num_leds <= 0) return;
 
-  fill_raw_noise16into8(V,num_leds,octaves,x,scale,time);
-  fill_raw_noise8(H,num_leds,hue_octaves,hue_x,hue_scale,time);
+    for (int j = 0; j < num_leds; j += 255) {
+        const int LedsRemaining = num_leds - j;
+        const int LedsPer = LedsRemaining > 255 ? 255 : LedsRemaining;  // limit to 255 max
+        if (LedsPer <= 0) continue;
+        FASTLED_STACK_ARRAY(uint8_t, V, LedsPer);
+        FASTLED_STACK_ARRAY(uint8_t, H, LedsPer);
 
-  for(int i = 0; i < num_leds; ++i) {
-    leds[i] = CHSV(H[i] + hue_shift,255,V[i]);
-  }
+        fl::memfill(V, 0, LedsPer);
+        fl::memfill(H, 0, LedsPer);
+
+        fill_raw_noise16into8(V, LedsPer, octaves, x, scale, time);
+        fill_raw_noise8(H, LedsPer, hue_octaves, hue_x, hue_scale, time);
+
+        for (int i = 0; i < LedsPer; ++i) {
+            leds[i + j] = CHSV(H[i] + hue_shift, 255, V[i]);
+        }
+    }
 }
 
 void fill_2dnoise8(CRGB *leds, int width, int height, bool serpentine,
             uint8_t octaves, uint16_t x, int xscale, uint16_t y, int yscale, uint16_t time,
             uint8_t hue_octaves, uint16_t hue_x, int hue_xscale, uint16_t hue_y, uint16_t hue_yscale,uint16_t hue_time,bool blend) {
-  uint8_t V[height][width];
-  uint8_t H[height][width];
+  const size_t array_size = (size_t)height * width;
+  if (array_size <= 0) return;
+  FASTLED_STACK_ARRAY(uint8_t, V, array_size);
+  FASTLED_STACK_ARRAY(uint8_t, H, array_size);
 
-  memset(V,0,height*width);
-  memset(H,0,height*width);
+  fl::memfill(V,0,height*width);
+  fl::memfill(H,0,height*width);
 
   fill_raw_2dnoise8((uint8_t*)V,width,height,octaves,x,xscale,y,yscale,time);
   fill_raw_2dnoise8((uint8_t*)H,width,height,hue_octaves,hue_x,hue_xscale,hue_y,hue_yscale,hue_time);
@@ -753,7 +895,7 @@ void fill_2dnoise8(CRGB *leds, int width, int height, bool serpentine,
   for(int i = 0; i < height; ++i) {
     int wb = i*width;
     for(int j = 0; j < width; ++j) {
-      CRGB led(CHSV(H[h1-i][w1-j],255,V[i][j]));
+      CRGB led(CHSV(H[(h1-i)*width + (w1-j)], 255, V[i*width + j]));
 
       int pos = j;
       if(serpentine && (i & 0x1)) {
@@ -761,7 +903,11 @@ void fill_2dnoise8(CRGB *leds, int width, int height, bool serpentine,
       }
 
       if(blend) {
-        leds[wb+pos] >>= 1; leds[wb+pos] += (led>>=1);
+        // Safer blending to avoid potential undefined behavior
+        CRGB temp = leds[wb+pos];
+        temp.nscale8(128); // Scale by 50%
+        led.nscale8(128);
+        leds[wb+pos] = temp + led;
       } else {
         leds[wb+pos] = led;
       }
@@ -769,14 +915,16 @@ void fill_2dnoise8(CRGB *leds, int width, int height, bool serpentine,
   }
 }
 
+
 void fill_2dnoise16(CRGB *leds, int width, int height, bool serpentine,
             uint8_t octaves, uint32_t x, int xscale, uint32_t y, int yscale, uint32_t time,
             uint8_t hue_octaves, uint16_t hue_x, int hue_xscale, uint16_t hue_y, uint16_t hue_yscale,uint16_t hue_time, bool blend, uint16_t hue_shift) {
-  uint8_t V[height][width];
-  uint8_t H[height][width];
 
-  memset(V,0,height*width);
-  memset(H,0,height*width);
+  FASTLED_STACK_ARRAY(uint8_t, V, height*width);
+  FASTLED_STACK_ARRAY(uint8_t, H, height*width);
+  
+  fl::memfill(V,0,height*width);
+  fl::memfill(H,0,height*width);
 
   fill_raw_2dnoise16into8((uint8_t*)V,width,height,octaves,q44(2,0),171,1,x,xscale,y,yscale,time);
   // fill_raw_2dnoise16into8((uint8_t*)V,width,height,octaves,x,xscale,y,yscale,time);
@@ -791,7 +939,7 @@ void fill_2dnoise16(CRGB *leds, int width, int height, bool serpentine,
   for(int i = 0; i < height; ++i) {
     int wb = i*width;
     for(int j = 0; j < width; ++j) {
-      CRGB led(CHSV(hue_shift + (H[h1-i][w1-j]),196,V[i][j]));
+      CRGB led(CHSV(hue_shift + (H[(h1-i)*width + (w1-j)]), 196, V[i*width + j]));
 
       int pos = j;
       if(serpentine && (i & 0x1)) {
@@ -808,3 +956,5 @@ void fill_2dnoise16(CRGB *leds, int width, int height, bool serpentine,
 }
 
 FASTLED_NAMESPACE_END
+
+#pragma GCC diagnostic pop

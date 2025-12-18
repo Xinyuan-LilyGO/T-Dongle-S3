@@ -1,23 +1,91 @@
 #define FASTLED_INTERNAL
 #include "FastLED.h"
+#include "fl/singleton.h"
+#include "fl/engine_events.h"
+#include "fl/compiler_control.h"
+#include "fl/int.h"
 
+/// @file FastLED.cpp
+/// Central source file for FastLED, implements the CFastLED class/object
+
+#ifndef MAX_CLED_CONTROLLERS
+#ifdef __AVR__
+// if mega or leonardo, allow more controllers
+#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) || defined(__AVR_ATmega32U4__)
+#define MAX_CLED_CONTROLLERS 16
+#else
+#define MAX_CLED_CONTROLLERS 8
+#endif
+#else
+#define MAX_CLED_CONTROLLERS 64
+#endif  // __AVR__
+#endif  // MAX_CLED_CONTROLLERS
+
+#ifndef FASTLED_MANUAL_ENGINE_EVENTS
+#define FASTLED_MANUAL_ENGINE_EVENTS 0
+#endif
 
 #if defined(__SAM3X8E__)
-volatile uint32_t fuckit;
+volatile fl::u32 fuckit;
+#endif
+
+// Disable to fix build breakage.
+// #ifndef FASTLED_DEFINE_WEAK_YEILD_FUNCTION
+// #if defined(__AVR_ATtiny13__)
+// // Arduino.h also defines this as a weak function on this platform.
+// #define FASTLED_DEFINE_WEAK_YEILD_FUNCTION 0
+// #else
+// #define FASTLED_DEFINE_WEAK_YEILD_FUNCTION 1
+// #endif
+// #endif
+
+/// Has to be declared outside of any namespaces.
+/// Called at program exit when run in a desktop environment. 
+/// Extra C definition that some environments may need. 
+/// @returns 0 to indicate success
+
+#ifndef FASTLED_NO_ATEXIT
+#define FASTLED_NO_ATEXIT 0
+#endif
+
+#if !FASTLED_NO_ATEXIT
+extern "C" FL_LINK_WEAK int atexit(void (* /*func*/ )()) { return 0; }
+#endif
+
+#ifdef FASTLED_NEEDS_YIELD
+extern "C" void yield(void) { }
 #endif
 
 FASTLED_NAMESPACE_BEGIN
 
+fl::u16 cled_contoller_size() {
+	return sizeof(CLEDController);
+}
+
+uint8_t get_brightness();
+
+/// Pointer to the matrix object when using the Smart Matrix Library
+/// @see https://github.com/pixelmatix/SmartMatrix
 void *pSmartMatrix = NULL;
 
-CFastLED FastLED;
+FL_DISABLE_WARNING_PUSH
+FL_DISABLE_WARNING_GLOBAL_CONSTRUCTORS
+
+CFastLED FastLED;  // global constructor allowed in this case.
+
+FL_DISABLE_WARNING_POP
 
 CLEDController *CLEDController::m_pHead = NULL;
 CLEDController *CLEDController::m_pTail = NULL;
-static uint32_t lastshow = 0;
+static fl::u32 lastshow = 0;
 
-uint32_t _frame_cnt=0;
-uint32_t _retry_cnt=0;
+/// Global frame counter, used for debugging ESP implementations
+/// @todo Include in FASTLED_DEBUG_COUNT_FRAME_RETRIES block?
+fl::u32 _frame_cnt=0;
+
+/// Global frame retry counter, used for debugging ESP implementations
+/// @todo Include in FASTLED_DEBUG_COUNT_FRAME_RETRIES block?
+fl::u32 _retry_cnt=0;
 
 // uint32_t CRGB::Squant = ((uint32_t)((__TIME__[4]-'0') * 28))<<16 | ((__TIME__[6]-'0')*50)<<8 | ((__TIME__[7]-'0')*28);
 
@@ -28,6 +96,15 @@ CFastLED::CFastLED() {
 	m_nFPS = 0;
 	m_pPowerFunc = NULL;
 	m_nPowerData = 0xFFFFFFFF;
+	m_nMinMicros = 0;
+}
+
+int CFastLED::size() {
+	return (*this)[0].size();
+}
+
+CRGB* CFastLED::leds() {
+	return (*this)[0].leds();
 }
 
 CLEDController &CFastLED::addLeds(CLEDController *pLed,
@@ -39,11 +116,22 @@ CLEDController &CFastLED::addLeds(CLEDController *pLed,
 	pLed->init();
 	pLed->setLeds(data + nOffset, nLeds);
 	FastLED.setMaxRefreshRate(pLed->getMaxRefreshRate(),true);
+	fl::EngineEvents::onStripAdded(pLed, nLedsOrOffset - nOffset);
 	return *pLed;
 }
 
+// This is bad code. But it produces the smallest binaries for reasons
+// beyond mortal comprehensions.
+// Instead of iterating through the link list for onBeginFrame(), beginShowLeds()
+// and endShowLeds(): store the pointers in an array and iterate through that.
+//
+// static uninitialized gControllersData produces the smallest binary on attiny85.
+static void* gControllersData[MAX_CLED_CONTROLLERS];
+
 void CFastLED::show(uint8_t scale) {
-	// guard against showing too rapidly
+#if !FASTLED_MANUAL_ENGINE_EVENTS
+	fl::EngineEvents::onBeginFrame();
+#endif
 	while(m_nMinMicros && ((micros()-lastshow) < m_nMinMicros));
 	lastshow = micros();
 
@@ -52,15 +140,48 @@ void CFastLED::show(uint8_t scale) {
 		scale = (*m_pPowerFunc)(scale, m_nPowerData);
 	}
 
+
+	int length = 0;
 	CLEDController *pCur = CLEDController::head();
-	while(pCur) {
-		uint8_t d = pCur->getDither();
-		if(m_nFPS < 100) { pCur->setDither(0); }
-		pCur->showLeds(scale);
-		pCur->setDither(d);
+
+	while(pCur && length < MAX_CLED_CONTROLLERS) {
+		if (pCur->getEnabled()) {
+			gControllersData[length] = pCur->beginShowLeds(pCur->size());
+		} else {
+			gControllersData[length] = nullptr;
+		}
+		length++;
+		if (m_nFPS < 100) { pCur->setDither(0); }
+		pCur = pCur->next();
+	}
+
+	pCur = CLEDController::head();
+	for (length = 0; length < MAX_CLED_CONTROLLERS && pCur; length++) {
+		if (pCur->getEnabled()) {
+			pCur->showLedsInternal(scale);
+		}
+		pCur = pCur->next();
+
+	}
+
+	length = 0;  // Reset length to 0 and iterate again.
+	pCur = CLEDController::head();
+	while(pCur && length < MAX_CLED_CONTROLLERS) {
+		if (pCur->getEnabled()) {
+			pCur->endShowLeds(gControllersData[length]);
+		}
+		length++;
 		pCur = pCur->next();
 	}
 	countFPS();
+	onEndFrame();
+#if !FASTLED_MANUAL_ENGINE_EVENTS
+	fl::EngineEvents::onEndShowLeds();
+#endif
+}
+
+void CFastLED::onEndFrame() {
+	fl::EngineEvents::onEndFrame();
 }
 
 int CFastLED::count() {
@@ -94,15 +215,38 @@ void CFastLED::showColor(const struct CRGB & color, uint8_t scale) {
 		scale = (*m_pPowerFunc)(scale, m_nPowerData);
 	}
 
+	int length = 0;
 	CLEDController *pCur = CLEDController::head();
-	while(pCur) {
-		uint8_t d = pCur->getDither();
+	while(pCur && length < MAX_CLED_CONTROLLERS) {
+		if (pCur->getEnabled()) {
+			gControllersData[length] = pCur->beginShowLeds(pCur->size());
+		} else {
+			gControllersData[length] = nullptr;
+		}
+		length++;
+		pCur = pCur->next();
+	}
+
+	pCur = CLEDController::head();
+	while(pCur && length < MAX_CLED_CONTROLLERS) {
 		if(m_nFPS < 100) { pCur->setDither(0); }
-		pCur->showColor(color, scale);
-		pCur->setDither(d);
+		if (pCur->getEnabled()) {
+			pCur->showColorInternal(color, scale);
+		}
+		pCur = pCur->next();
+	}
+
+	pCur = CLEDController::head();
+	length = 0;  // Reset length to 0 and iterate again.
+	while(pCur && length < MAX_CLED_CONTROLLERS) {
+		if (pCur->getEnabled()) {
+			pCur->endShowLeds(gControllersData[length]);
+		}
+		length++;
 		pCur = pCur->next();
 	}
 	countFPS();
+	onEndFrame();
 }
 
 void CFastLED::clear(bool writeData) {
@@ -115,7 +259,7 @@ void CFastLED::clear(bool writeData) {
 void CFastLED::clearData() {
 	CLEDController *pCur = CLEDController::head();
 	while(pCur) {
-		pCur->clearLedData();
+		pCur->clearLedDataInternal();
 		pCur = pCur->next();
 	}
 }
@@ -200,15 +344,21 @@ void CFastLED::setDither(uint8_t ditherMode)  {
 // 	transpose8<1,2>(in.bytes + 8, out.bytes + 1);
 // }
 
+
+/// Unused value
+/// @todo Remove?
 extern int noise_min;
+
+/// Unused value
+/// @todo Remove?
 extern int noise_max;
 
 void CFastLED::countFPS(int nFrames) {
 	static int br = 0;
-	static uint32_t lastframe = 0; // millis();
+	static fl::u32 lastframe = 0; // millis();
 
 	if(br++ >= nFrames) {
-		uint32_t now = millis();
+		fl::u32 now = millis();
 		now -= lastframe;
 		if(now == 0) {
 			now = 1; // prevent division by zero below
@@ -219,7 +369,7 @@ void CFastLED::countFPS(int nFrames) {
 	}
 }
 
-void CFastLED::setMaxRefreshRate(uint16_t refresh, bool constrain) {
+void CFastLED::setMaxRefreshRate(fl::u16 refresh, bool constrain) {
 	if(constrain) {
 		// if we're constraining, the new value of m_nMinMicros _must_ be higher than previously (because we're only
 		// allowed to slow things down if constraining)
@@ -233,11 +383,12 @@ void CFastLED::setMaxRefreshRate(uint16_t refresh, bool constrain) {
 	}
 }
 
-extern "C" int atexit(void (* /*func*/ )()) { return 0; }
 
-#ifdef FASTLED_NEEDS_YIELD
-extern "C" void yield(void) { }
-#endif
+uint8_t get_brightness() {
+	return FastLED.getBrightness();
+}
+
+
 
 #ifdef NEED_CXX_BITS
 namespace __cxxabiv1
@@ -251,9 +402,9 @@ namespace __cxxabiv1
 	/* The ABI requires a 64-bit type.  */
 	__extension__ typedef int __guard __attribute__((mode(__DI__)));
 
-	extern "C" int __cxa_guard_acquire (__guard *) __attribute__((weak));
-	extern "C" void __cxa_guard_release (__guard *) __attribute__((weak));
-	extern "C" void __cxa_guard_abort (__guard *) __attribute__((weak));
+	extern "C" int __cxa_guard_acquire (__guard *) FL_LINK_WEAK;
+	extern "C" void __cxa_guard_release (__guard *) FL_LINK_WEAK;
+	extern "C" void __cxa_guard_abort (__guard *) FL_LINK_WEAK;
 
 	extern "C" int __cxa_guard_acquire (__guard *g)
 	{

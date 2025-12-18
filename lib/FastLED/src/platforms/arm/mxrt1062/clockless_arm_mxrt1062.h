@@ -11,7 +11,7 @@ FASTLED_NAMESPACE_BEGIN
 
 #define _FASTLED_NS_TO_DWT(_NS) (((F_CPU_ACTUAL>>16)*(_NS)) / (1000000000UL>>16))
 
-template <int DATA_PIN, int T1, int T2, int T3, EOrder RGB_ORDER = RGB, int XTRA0 = 0, bool FLIP = false, int WAIT_TIME = 50>
+template <int DATA_PIN, int T1, int T2, int T3, EOrder RGB_ORDER = RGB, int XTRA0 = 0, bool FLIP = false, int WAIT_TIME = 280>
 class ClocklessController : public CPixelLEDController<RGB_ORDER> {
 	typedef typename FastPin<DATA_PIN>::port_ptr_t data_ptr_t;
 	typedef typename FastPin<DATA_PIN>::port_t data_t;
@@ -50,8 +50,8 @@ protected:
     	mWait.mark();
   	}
 
-	template<int BITS> __attribute__ ((always_inline)) inline void writeBits(register uint32_t & next_mark, register uint32_t & b)  {
-		for(register uint32_t i = BITS-1; i > 0; --i) {
+	template<int BITS> __attribute__ ((always_inline)) inline void writeBits(FASTLED_REGISTER uint32_t & next_mark, FASTLED_REGISTER uint32_t & b)  {
+		for(FASTLED_REGISTER uint32_t i = BITS-1; i > 0; --i) {
 			while(ARM_DWT_CYCCNT < next_mark);
 			next_mark = ARM_DWT_CYCCNT + off[0];
 			FastPin<DATA_PIN>::hi();
@@ -83,7 +83,7 @@ protected:
 
 		// Setup the pixel controller and load/scale the first byte
 		pixels.preStepFirstByteDithering();
-		register uint32_t b = pixels.loadAndScale0();
+		FASTLED_REGISTER uint32_t b = pixels.loadAndScale0();
 
 		cli();
 

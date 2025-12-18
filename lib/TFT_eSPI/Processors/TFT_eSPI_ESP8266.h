@@ -19,7 +19,7 @@
 #define DMA_BUSY_CHECK // DMA not available, leave blank
 
 // Initialise processor specific SPI functions, used by init()
-#if (!defined (SUPPORT_TRANSACTIONS) && defined (ESP8266))
+#if (!defined (SUPPORT_TRANSACTIONS) && defined (ARDUINO_ARCH_ESP8266))
   #define INIT_TFT_DATA_BUS \
     spi.setBitOrder(MSBFIRST); \
     spi.setDataMode(TFT_SPI_MODE); \
@@ -117,17 +117,17 @@
 ////////////////////////////////////////////////////////////////////////////////////////
 // Macros to write commands/pixel colour data to a SPI ILI948x TFT
 ////////////////////////////////////////////////////////////////////////////////////////
-#if  defined (SPI_18BIT_DRIVER) // SPI 18 bit colour
+#if  defined (SPI_18BIT_DRIVER) // SPI 18-bit colour
 
   // Write 8 bits to TFT
   #define tft_Write_8(C)   spi.transfer(C)
 
-  // Convert 16 bit colour to 18 bit and write in 3 bytes
+  // Convert 16-bit colour to 18-bit and write in 3 bytes
   #define tft_Write_16(C)  spi.transfer(((C) & 0xF800)>>8); \
                            spi.transfer(((C) & 0x07E0)>>3); \
                            spi.transfer(((C) & 0x001F)<<3)
 
-  // Convert swapped byte 16 bit colour to 18 bit and write in 3 bytes
+  // Convert swapped byte 16-bit colour to 18-bit and write in 3 bytes
   #define tft_Write_16S(C) spi.transfer((C) & 0xF8); \
                            spi.transfer(((C) & 0xE000)>>11 | ((C) & 0x07)<<5); \
                            spi.transfer(((C) & 0x1F00)>>5)
@@ -148,7 +148,7 @@
   // Command is 16 bits
   #define CMD_BITS 16
 
-  // ESP8266 low level SPI writes for 8, 16 and 32 bit values
+  // ESP8266 low level SPI writes for 8, 16 and 32-bit values
   // to avoid the function call overhead
   #define TFT_WRITE_BITS(D, B) \
   SPI1U1 = ((B-1) << SPILMOSI); \

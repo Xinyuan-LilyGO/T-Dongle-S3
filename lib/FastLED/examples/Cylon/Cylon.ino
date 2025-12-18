@@ -1,4 +1,11 @@
+/// @file    Cylon.ino
+/// @brief   An animation that moves a single LED back and forth as the entire strip changes.
+///          (Larson Scanner effect)
+/// @example Cylon.ino
+
 #include <FastLED.h>
+
+using namespace fl;
 
 // How many leds in your strip?
 #define NUM_LEDS 64 

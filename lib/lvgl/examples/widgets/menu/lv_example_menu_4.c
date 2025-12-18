@@ -5,7 +5,7 @@ static uint32_t btn_cnt = 1;
 static lv_obj_t * main_page;
 static lv_obj_t * menu;
 
-static void float_btn_event_cb(lv_event_t * e)
+static void float_button_event_cb(lv_event_t * e)
 {
     LV_UNUSED(e);
 
@@ -18,11 +18,11 @@ static void float_btn_event_cb(lv_event_t * e)
 
     cont = lv_menu_cont_create(sub_page);
     label = lv_label_create(cont);
-    lv_label_set_text_fmt(label, "Hello, I am hiding inside %i", btn_cnt);
+    lv_label_set_text_fmt(label, "Hello, I am hiding inside %" LV_PRIu32"", btn_cnt);
 
     cont = lv_menu_cont_create(main_page);
     label = lv_label_create(cont);
-    lv_label_set_text_fmt(label, "Item %i", btn_cnt);
+    lv_label_set_text_fmt(label, "Item %" LV_PRIu32"", btn_cnt);
     lv_menu_set_load_page_event(menu, cont, sub_page);
 
     lv_obj_scroll_to_view_recursive(cont, LV_ANIM_ON);
@@ -31,8 +31,8 @@ static void float_btn_event_cb(lv_event_t * e)
 void lv_example_menu_4(void)
 {
     /*Create a menu object*/
-    menu = lv_menu_create(lv_scr_act());
-    lv_obj_set_size(menu, lv_disp_get_hor_res(NULL), lv_disp_get_ver_res(NULL));
+    menu = lv_menu_create(lv_screen_active());
+    lv_obj_set_size(menu, lv_display_get_horizontal_resolution(NULL), lv_display_get_vertical_resolution(NULL));
     lv_obj_center(menu);
 
     lv_obj_t * cont;
@@ -56,15 +56,14 @@ void lv_example_menu_4(void)
     lv_menu_set_page(menu, main_page);
 
     /*Create floating btn*/
-    lv_obj_t * float_btn = lv_btn_create(lv_scr_act());
+    lv_obj_t * float_btn = lv_button_create(lv_screen_active());
     lv_obj_set_size(float_btn, 50, 50);
     lv_obj_add_flag(float_btn, LV_OBJ_FLAG_FLOATING);
     lv_obj_align(float_btn, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
-    lv_obj_add_event_cb(float_btn, float_btn_event_cb, LV_EVENT_CLICKED, menu);
+    lv_obj_add_event_cb(float_btn, float_button_event_cb, LV_EVENT_CLICKED, menu);
     lv_obj_set_style_radius(float_btn, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_img_src(float_btn, LV_SYMBOL_PLUS, 0);
+    lv_obj_set_style_bg_image_src(float_btn, LV_SYMBOL_PLUS, 0);
     lv_obj_set_style_text_font(float_btn, lv_theme_get_font_large(float_btn), 0);
 }
 
 #endif
-

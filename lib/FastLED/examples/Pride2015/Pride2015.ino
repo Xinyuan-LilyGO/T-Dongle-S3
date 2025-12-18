@@ -1,12 +1,12 @@
+/// @file    Pride2015.ino
+/// @brief   Animated, ever-changing rainbows.
+/// @example Pride2015.ino
+
 #include "FastLED.h"
 
 // Pride2015
 // Animated, ever-changing rainbows.
 // by Mark Kriegsman
-
-#if FASTLED_VERSION < 3001000
-#error "Requires FastLED 3.1 or later; check github for latest code."
-#endif
 
 #define DATA_PIN    3
 //#define CLK_PIN   4
@@ -30,6 +30,7 @@ void setup() {
   FastLED.setBrightness(BRIGHTNESS);
 }
 
+void pride();
 
 void loop()
 {

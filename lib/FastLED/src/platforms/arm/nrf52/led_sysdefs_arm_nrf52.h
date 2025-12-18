@@ -1,7 +1,11 @@
 #ifndef __LED_SYSDEFS_ARM_NRF52
 #define __LED_SYSDEFS_ARM_NRF52
 
-#define FASTLED_ARM
+#include "fl/force_inline.h"
+
+#ifndef FASTLED_ARM
+#error "FASTLED_ARM must be defined before including this header. Ensure platforms/arm/is_arm.h is included first."
+#endif
 
 #ifndef F_CPU
     #define F_CPU 64000000 // the NRF52 series has a 64MHz CPU
@@ -29,9 +33,9 @@
 #define FASTLED_NRF52_ENABLE_PWM_INSTANCE0
 
 #if defined(FASTLED_NRF52_NEVER_INLINE)
-    #define FASTLED_NRF52_INLINE_ATTRIBUTE __attribute__((always_inline)) inline
+    #define FASTLED_NRF52_INLINE_ATTRIBUTE FASTLED_FORCE_INLINE
 #else     
-    #define FASTLED_NRF52_INLINE_ATTRIBUTE __attribute__((always_inline)) inline
+    #define FASTLED_NRF52_INLINE_ATTRIBUTE FASTLED_FORCE_INLINE
 #endif    
 
 

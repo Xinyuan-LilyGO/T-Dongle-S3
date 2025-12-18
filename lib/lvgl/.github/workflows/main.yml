@@ -4,10 +4,10 @@ on:
 
 jobs:
   auto_close_issues:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@v5
       - name: Automatically close issues that don't follow the issue template
         uses: lucasbento/auto-close-issues@v1.0.2
         with:

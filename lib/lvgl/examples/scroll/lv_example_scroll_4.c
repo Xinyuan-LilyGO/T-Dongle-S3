@@ -1,13 +1,12 @@
 #include "../lv_examples.h"
 #if LV_BUILD_EXAMPLES && LV_USE_LIST
 
-
 /**
  * Styling the scrollbars
  */
 void lv_example_scroll_4(void)
 {
-    lv_obj_t * obj = lv_obj_create(lv_scr_act());
+    lv_obj_t * obj = lv_obj_create(lv_screen_active());
     lv_obj_set_size(obj, 200, 100);
     lv_obj_center(obj);
 
@@ -28,7 +27,6 @@ void lv_example_scroll_4(void)
                       "Fusce molestie rhoncus nisi sit amet tincidunt. \n"
                       "Suspendisse a nunc ut magna ornare volutpat.");
 
-
     /*Remove the style of scrollbar to have clean start*/
     lv_obj_remove_style(obj, NULL, LV_PART_SCROLLBAR | LV_STATE_ANY);
 
@@ -41,6 +39,7 @@ void lv_example_scroll_4(void)
     static lv_style_t style;
     lv_style_init(&style);
     lv_style_set_width(&style, 4);      /*Width of the scrollbar*/
+    lv_style_set_length(&style, 20);    /*Length of the scrollbar*/
     lv_style_set_pad_right(&style, 5);  /*Space from the parallel side*/
     lv_style_set_pad_top(&style, 5);    /*Space from the perpendicular side*/
 

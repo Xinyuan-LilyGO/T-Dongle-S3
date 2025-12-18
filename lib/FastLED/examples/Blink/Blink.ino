@@ -1,3 +1,8 @@
+/// @file    Blink.ino
+/// @brief   Blink the first LED of an LED strip
+/// @example Blink.ino
+
+#include <Arduino.h>
 #include <FastLED.h>
 
 // How many leds in your strip?
@@ -14,9 +19,15 @@
 CRGB leds[NUM_LEDS];
 
 void setup() { 
+    //Serial.begin(9600);
+    //Serial.println("BLINK setup starting");
+    
     // Uncomment/edit one of the following lines for your leds arrangement.
     // ## Clockless types ##
     FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);  // GRB ordering is assumed
+    
+    //Serial.println("BLINK setup complete");
+    // FastLED.addLeds<SM16824E, DATA_PIN, RGB>(leds, NUM_LEDS);  // RGB ordering (uses SM16824EController)
     // FastLED.addLeds<SM16703, DATA_PIN, RGB>(leds, NUM_LEDS);
     // FastLED.addLeds<TM1829, DATA_PIN, RGB>(leds, NUM_LEDS);
     // FastLED.addLeds<TM1812, DATA_PIN, RGB>(leds, NUM_LEDS);
@@ -58,10 +69,13 @@ void setup() {
 }
 
 void loop() { 
+  //Serial.println("BLINK");
+  
   // Turn the LED on, then pause
   leds[0] = CRGB::Red;
   FastLED.show();
   delay(500);
+  
   // Now turn the LED off, then pause
   leds[0] = CRGB::Black;
   FastLED.show();

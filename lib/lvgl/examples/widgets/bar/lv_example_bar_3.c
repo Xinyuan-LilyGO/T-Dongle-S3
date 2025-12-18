@@ -3,7 +3,7 @@
 
 static void set_temp(void * bar, int32_t temp)
 {
-    lv_bar_set_value(bar, temp, LV_ANIM_ON);
+    lv_bar_set_value((lv_obj_t *)bar, temp, LV_ANIM_ON);
 }
 
 /**
@@ -19,7 +19,7 @@ void lv_example_bar_3(void)
     lv_style_set_bg_grad_color(&style_indic, lv_palette_main(LV_PALETTE_BLUE));
     lv_style_set_bg_grad_dir(&style_indic, LV_GRAD_DIR_VER);
 
-    lv_obj_t * bar = lv_bar_create(lv_scr_act());
+    lv_obj_t * bar = lv_bar_create(lv_screen_active());
     lv_obj_add_style(bar, &style_indic, LV_PART_INDICATOR);
     lv_obj_set_size(bar, 20, 200);
     lv_obj_center(bar);
@@ -28,13 +28,12 @@ void lv_example_bar_3(void)
     lv_anim_t a;
     lv_anim_init(&a);
     lv_anim_set_exec_cb(&a, set_temp);
-    lv_anim_set_time(&a, 3000);
-    lv_anim_set_playback_time(&a, 3000);
+    lv_anim_set_duration(&a, 3000);
+    lv_anim_set_reverse_duration(&a, 3000);
     lv_anim_set_var(&a, bar);
     lv_anim_set_values(&a, -20, 40);
     lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
     lv_anim_start(&a);
 }
-
 
 #endif

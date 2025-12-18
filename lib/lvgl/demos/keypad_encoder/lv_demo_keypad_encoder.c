@@ -49,23 +49,24 @@ void lv_demo_keypad_encoder(void)
     g = lv_group_create();
     lv_group_set_default(g);
 
-    lv_indev_t * cur_drv = NULL;
+    lv_indev_t * indev = NULL;
     for(;;) {
-        cur_drv = lv_indev_get_next(cur_drv);
-        if(!cur_drv) {
+        indev = lv_indev_get_next(indev);
+        if(!indev) {
             break;
         }
 
-        if(cur_drv->driver->type == LV_INDEV_TYPE_KEYPAD) {
-            lv_indev_set_group(cur_drv, g);
+        lv_indev_type_t indev_type = lv_indev_get_type(indev);
+        if(indev_type == LV_INDEV_TYPE_KEYPAD) {
+            lv_indev_set_group(indev, g);
         }
 
-        if(cur_drv->driver->type == LV_INDEV_TYPE_ENCODER) {
-            lv_indev_set_group(cur_drv, g);
+        if(indev_type == LV_INDEV_TYPE_ENCODER) {
+            lv_indev_set_group(indev, g);
         }
     }
 
-    tv = lv_tabview_create(lv_scr_act(), LV_DIR_TOP, LV_DPI_DEF / 3);
+    tv = lv_tabview_create(lv_screen_active());
 
     t1 = lv_tabview_add_tab(tv, "Selectors");
     t2 = lv_tabview_add_tab(tv, "Text input");
@@ -101,7 +102,7 @@ static void selectors_create(lv_obj_t * parent)
     obj = lv_calendar_create(parent);
     lv_obj_add_flag(obj, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
 
-    obj = lv_btnmatrix_create(parent);
+    obj = lv_buttonmatrix_create(parent);
     lv_obj_add_flag(obj, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
 
     obj = lv_checkbox_create(parent);
@@ -129,13 +130,13 @@ static void selectors_create(lv_obj_t * parent)
         lv_obj_set_height(list, lv_obj_get_content_height(parent));
     }
 
-    lv_list_add_btn(list, LV_SYMBOL_OK, "Apply");
-    lv_list_add_btn(list, LV_SYMBOL_CLOSE, "Close");
-    lv_list_add_btn(list, LV_SYMBOL_EYE_OPEN, "Show");
-    lv_list_add_btn(list, LV_SYMBOL_EYE_CLOSE, "Hide");
-    lv_list_add_btn(list, LV_SYMBOL_TRASH, "Delete");
-    lv_list_add_btn(list, LV_SYMBOL_COPY, "Copy");
-    lv_list_add_btn(list, LV_SYMBOL_PASTE, "Paste");
+    lv_list_add_button(list, LV_SYMBOL_OK, "Apply");
+    lv_list_add_button(list, LV_SYMBOL_CLOSE, "Close");
+    lv_list_add_button(list, LV_SYMBOL_EYE_OPEN, "Show");
+    lv_list_add_button(list, LV_SYMBOL_EYE_CLOSE, "Hide");
+    lv_list_add_button(list, LV_SYMBOL_TRASH, "Delete");
+    lv_list_add_button(list, LV_SYMBOL_COPY, "Copy");
+    lv_list_add_button(list, LV_SYMBOL_PASTE, "Paste");
 }
 
 static void text_input_create(lv_obj_t * parent)
@@ -152,7 +153,7 @@ static void text_input_create(lv_obj_t * parent)
     lv_textarea_set_one_line(ta2, true);
     lv_textarea_set_placeholder_text(ta2, "Type something");
 
-    lv_obj_t * kb = lv_keyboard_create(lv_scr_act());
+    lv_obj_t * kb = lv_keyboard_create(lv_screen_active());
     lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
 
     lv_obj_add_event_cb(ta1, ta_event_cb, LV_EVENT_ALL, kb);
@@ -161,11 +162,14 @@ static void text_input_create(lv_obj_t * parent)
 
 static void msgbox_create(void)
 {
-    static const char * btns[] = {"Ok", "Cancel", ""};
-    lv_obj_t * mbox = lv_msgbox_create(NULL, "Hi", "Welcome to the keyboard and encoder demo", btns, false);
-    lv_obj_add_event_cb(mbox, msgbox_event_cb, LV_EVENT_ALL, NULL);
-    lv_group_focus_obj(lv_msgbox_get_btns(mbox));
-    lv_obj_add_state(lv_msgbox_get_btns(mbox), LV_STATE_FOCUS_KEY);
+    lv_obj_t * mbox = lv_msgbox_create(NULL);
+    lv_msgbox_add_title(mbox, "Hi");
+    lv_msgbox_add_text(mbox, "Welcome to the keyboard and encoder demo");
+
+    lv_obj_t * btn = lv_msgbox_add_footer_button(mbox, "Ok");
+    lv_obj_add_event_cb(btn, msgbox_event_cb, LV_EVENT_CLICKED, mbox);
+    lv_group_focus_obj(btn);
+    lv_obj_add_state(btn, LV_STATE_FOCUS_KEY);
     lv_group_focus_freeze(g, true);
 
     lv_obj_align(mbox, LV_ALIGN_CENTER, 0, 0);
@@ -177,24 +181,17 @@ static void msgbox_create(void)
 
 static void msgbox_event_cb(lv_event_t * e)
 {
-    lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t * msgbox = lv_event_get_current_target(e);
+    lv_obj_t * msgbox = lv_event_get_user_data(e);
 
-    if(code == LV_EVENT_VALUE_CHANGED) {
-        const char * txt = lv_msgbox_get_active_btn_text(msgbox);
-        if(txt) {
-            lv_msgbox_close(msgbox);
-            lv_group_focus_freeze(g, false);
-            lv_group_focus_obj(lv_obj_get_child(t1, 0));
-            lv_obj_scroll_to(t1, 0, 0, LV_ANIM_OFF);
-
-        }
-    }
+    lv_msgbox_close(msgbox);
+    lv_group_focus_freeze(g, false);
+    lv_group_focus_obj(lv_obj_get_child(t1, 0));
+    lv_obj_scroll_to(t1, 0, 0, LV_ANIM_OFF);
 }
 
 static void ta_event_cb(lv_event_t * e)
 {
-    lv_indev_t * indev = lv_indev_get_act();
+    lv_indev_t * indev = lv_indev_active();
     if(indev == NULL) return;
     lv_indev_type_t indev_type = lv_indev_get_type(indev);
 
@@ -204,9 +201,9 @@ static void ta_event_cb(lv_event_t * e)
 
     if(code == LV_EVENT_CLICKED && indev_type == LV_INDEV_TYPE_ENCODER) {
         lv_keyboard_set_textarea(kb, ta);
-        lv_obj_clear_flag(kb, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(kb, LV_OBJ_FLAG_HIDDEN);
         lv_group_focus_obj(kb);
-        lv_group_set_editing(lv_obj_get_group(kb), kb);
+        lv_group_set_editing(lv_obj_get_group(kb), kb != NULL);
         lv_obj_set_height(tv, LV_VER_RES / 2);
         lv_obj_align(kb, LV_ALIGN_BOTTOM_MID, 0, 0);
     }

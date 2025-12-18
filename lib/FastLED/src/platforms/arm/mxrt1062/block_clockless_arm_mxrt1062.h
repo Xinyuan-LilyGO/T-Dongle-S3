@@ -8,7 +8,7 @@ FASTLED_NAMESPACE_BEGIN
 #if defined(FASTLED_TEENSY4)
 
 #define __FL_T4_MASK ((1<<(LANES))-1)
-template <uint8_t LANES, int FIRST_PIN, int T1, int T2, int T3, EOrder RGB_ORDER = GRB, int XTRA0 = 0, bool FLIP = false, int WAIT_TIME = 50>
+template <uint8_t LANES, int FIRST_PIN, int T1, int T2, int T3, EOrder RGB_ORDER = GRB, int XTRA0 = 0, bool FLIP = false, int WAIT_TIME = 280>
 class FlexibleInlineBlockClocklessController : public CPixelLEDController<RGB_ORDER, LANES, __FL_T4_MASK> {
     uint8_t m_bitOffsets[16];
     uint8_t m_nActualLanes;
@@ -36,7 +36,7 @@ public:
 
     virtual void init() {
         // pre-initialize
-        memset(m_bitOffsets,0,16);
+        fl::memfill(m_bitOffsets,0,16);
         m_nActualLanes = 0;
         m_nLowBit = 33;
         m_nHighBit = 0;
@@ -116,15 +116,15 @@ public:
   } _outlines;
 
 
-  template<int BITS,int PX> __attribute__ ((always_inline)) inline void writeBits(register uint32_t & next_mark, register _outlines & b, PixelController<RGB_ORDER, LANES, __FL_T4_MASK> &pixels) {
+  template<int BITS,int PX> __attribute__ ((always_inline)) inline void writeBits(FASTLED_REGISTER uint32_t & next_mark, FASTLED_REGISTER _outlines & b, PixelController<RGB_ORDER, LANES, __FL_T4_MASK> &pixels) {
         _outlines b2;
         transpose8x1(b.bg[3], b2.bg[3]);
         transpose8x1(b.bg[2], b2.bg[2]);
         transpose8x1(b.bg[1], b2.bg[1]);
         transpose8x1(b.bg[0], b2.bg[0]);
 
-        register uint8_t d = pixels.template getd<PX>(pixels);
-        register uint8_t scale = pixels.template getscale<PX>(pixels);
+        FASTLED_REGISTER uint8_t d = pixels.template getd<PX>(pixels);
+        FASTLED_REGISTER uint8_t scale = pixels.template getscale<PX>(pixels);
 
         int x = 0;
         for(uint32_t i = 8; i > 0;) {

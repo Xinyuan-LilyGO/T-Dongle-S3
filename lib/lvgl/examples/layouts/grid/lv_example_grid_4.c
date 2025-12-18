@@ -6,14 +6,13 @@
  */
 void lv_example_grid_4(void)
 {
-    static lv_coord_t col_dsc[] = {60, 60, 60, LV_GRID_TEMPLATE_LAST};
-    static lv_coord_t row_dsc[] = {45, 45, 45, LV_GRID_TEMPLATE_LAST};
-
+    static int32_t col_dsc[] = {60, 60, 60, LV_GRID_TEMPLATE_LAST};
+    static int32_t row_dsc[] = {45, 45, 45, LV_GRID_TEMPLATE_LAST};
 
     /*Add space between the columns and move the rows to the bottom (end)*/
 
     /*Create a container with grid*/
-    lv_obj_t * cont = lv_obj_create(lv_scr_act());
+    lv_obj_t * cont = lv_obj_create(lv_screen_active());
     lv_obj_set_grid_align(cont, LV_GRID_ALIGN_SPACE_BETWEEN, LV_GRID_ALIGN_END);
     lv_obj_set_grid_dsc_array(cont, col_dsc, row_dsc);
     lv_obj_set_size(cont, 300, 220);
@@ -21,7 +20,7 @@ void lv_example_grid_4(void)
 
     lv_obj_t * label;
     lv_obj_t * obj;
-    uint32_t i;
+    uint8_t i;
     for(i = 0; i < 9; i++) {
         uint8_t col = i % 3;
         uint8_t row = i / 3;
