@@ -112,6 +112,14 @@
 | 🔗USB input voltage range | 4.8V~5.5V |
 | ⚡USB Max Current         | 800mA     |
 
+### ✨ Display-Features
+
+| Features     | Params       |
+| ------------ | ------------ |
+| Resolution   | 160 x 80     |
+| Display Size | 0.96 Inch    |
+| Driver IC    | ST7735 (SPI) |
+
 ### QWIIC Connector
 
 ![QWIIC](../../static/QWIIC.png)
@@ -141,3 +149,4 @@
 
 * [T-Dongle-S3 Schematic](../../../schematic/T-Dongle-S3-QWIIC.pdf)
 * [Case](../../../case/README.MD)
+* [Display datasheet](../../../datasheet/ST773_datasheet.pdf)
