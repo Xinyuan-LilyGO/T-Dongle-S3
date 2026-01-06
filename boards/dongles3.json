@@ -7,7 +7,9 @@
         "extra_flags": [
             "-DARDUINO_RUNNING_CORE=1",
             "-DARDUINO_EVENT_RUNNING_CORE=1",
-            "-DARDUINO_DONGLES3"
+            "-DARDUINO_DONGLES3",
+            "-DARDUINO_USB_MODE=1",
+            "-DARDUINO_USB_CDC_ON_BOOT=1"
         ],
         "f_cpu": "240000000L",
         "f_flash": "80000000L",
