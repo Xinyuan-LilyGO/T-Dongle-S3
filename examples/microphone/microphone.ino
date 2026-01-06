@@ -26,8 +26,8 @@ void loop() {}
 #define SD_MMC_CLK_PIN  12
 #define SD_MMC_CMD_PIN  16
 // PDM microphone pins
-#define PDM_SCK         41
-#define PDM_DATA        2
+#define PDM_SCK         9
+#define PDM_DATA        8
 
 // Create an instance of the I2SClass
 I2SClass i2s;

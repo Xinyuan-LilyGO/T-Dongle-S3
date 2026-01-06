@@ -10,7 +10,7 @@
 #include <IRremoteESP8266.h>
 #include <IRsend.h>
 
-#define PIN_NUM_IR_SEND    45
+#define PIN_NUM_IR_SEND    7
 
 
 IRsend irsend(PIN_NUM_IR_SEND);  // Set the GPIO to be used to sending the message.

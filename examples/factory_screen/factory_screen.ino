@@ -55,6 +55,31 @@
 #define LV_SCREEN_WIDTH             160
 #define LV_SCREEN_HEIGHT            80
 
+#ifdef ARDUINO_DONGLES3_PLUS
+// T-Dongle-S3-Plus Only Pins
+#define IR_SEND_PIN                 7
+#define MIC_DATA                    8
+#define MIC_SCK                     9
+
+// IR Remote library
+#include <IRsend.h>
+IRsend irsend(IR_SEND_PIN);
+
+// PDM Microphone
+#include "blow_detector.h"
+BlowDetector pdm;
+lv_obj_t *bar;
+
+LV_IMG_DECLARE(img_logo);
+const void *img_src = &img_logo;
+#else
+LV_IMG_DECLARE(img_t_dongle_s3_ce_fcc);
+const void *img_src = &img_t_dongle_s3_ce_fcc;
+#endif
+
+
+
+
 LV_FONT_DECLARE(lv_font_maplemomo_12);
 LV_FONT_DECLARE(lv_font_maplemomo_14);
 LV_FONT_DECLARE(lv_font_maplemomo_16);
@@ -79,6 +104,7 @@ static esp_lcd_panel_io_spi_config_t io_config = ST7735_PANEL_IO_SPI_CONFIG(
         PIN_NUM_CS, PIN_NUM_DC, NULL, NULL);
 
 uint32_t rgb_change_interval = 0; // milliseconds
+uint32_t ir_send_interval = 0;
 uint8_t  rgb_hue = 0;
 uint16_t disp_width = LCD_PIXEL_WIDTH;
 uint16_t disp_height = LCD_PIXEL_HEIGHT;
@@ -102,6 +128,11 @@ static uint32_t lv_tick_get_callback(void)
 
 void setup()
 {
+
+    // Turn off backlight
+    pinMode(PIN_NUM_BCKL, OUTPUT);
+    digitalWrite(PIN_NUM_BCKL, HIGH);
+
     Serial.begin(115200);
 
     Serial.println("Hello T-Dongle-S3");
@@ -128,6 +159,7 @@ void setup()
         } else {
             Serial.println("UNKNOWN");
         }
+        Serial.printf("SD_MMC Card Size: %llu bytes\n", SD_MMC.cardSize());
     }
 
     // ================= Initialize SPI bus =================
@@ -165,7 +197,7 @@ void setup()
     lv_init();
 
     Serial.println("LVGL initialized");
-    size_t lv_buffer_size = disp_width * disp_height* sizeof(lv_color16_t);
+    size_t lv_buffer_size = disp_width * disp_height * sizeof(lv_color16_t);
     lv_color16_t *buf = (lv_color16_t *)malloc(lv_buffer_size);
     assert(buf);
     lv_display_t *disp_drv = lv_display_create(disp_width, disp_height);
@@ -186,9 +218,9 @@ void setup()
     lv_obj_t *tile1 = lv_tileview_add_tile(tileview, 0, 0, LV_DIR_VER);
     lv_obj_t *tile2 = lv_tileview_add_tile(tileview, 0, 1, LV_DIR_VER);
 
-    LV_IMG_DECLARE(img_t_dongle_s3_ce_fcc);
     lv_obj_t *img = lv_image_create(tile1);
-    lv_image_set_src(img, &img_t_dongle_s3_ce_fcc);
+
+    lv_image_set_src(img, img_src);
     lv_obj_center(img);
 
     lv_obj_t *cont = lv_obj_create(tile2);
@@ -300,6 +332,10 @@ void setup()
         lv_obj_t *label = (lv_obj_t *)lv_timer_get_user_data(timer);
         lv_label_set_text_fmt(label, "%ddBm", WiFi.RSSI());
     }, 2000, rssi_label);
+
+    // Refresh the display
+    lv_task_handler();
+
     // ======================= Initialize Backlight =======================
 
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5,0,0)
@@ -309,8 +345,14 @@ void setup()
     ledcAttachPin(PIN_NUM_BCKL, LEDC_BACKLIGHT_CHANNEL);
 #endif
 
-    ledcWrite(LEDC_BACKLIGHT_CHANNEL, 0); // Set backlight to maximum brightness
+    // Adjust brightness
+    for (int i = 255; i > 0; --i) {
+        ledcWrite(LEDC_BACKLIGHT_CHANNEL, i);
+        delay(20);
+    }
 
+    // Set backlight to maximum brightness
+    ledcWrite(LEDC_BACKLIGHT_CHANNEL, 0);
 
     // Auto switch to the 2nd tile after 3 seconds
     lv_timer_create([](lv_timer_t * timer) {
@@ -319,12 +361,38 @@ void setup()
     }, 3000, NULL);
 
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+#ifdef ARDUINO_DONGLES3_PLUS
+    // ======================= Initialize IR =======================
+    irsend.begin();
+
+    // ===================== Initialize PDM Microphone =============
+    if (!pdm.begin()) {
+        Serial.println("BlowDetector begin failed");
+    } else {
+        Serial.println("BlowDetector begin succeeded");
+    }
+
+    bar = lv_bar_create(cont);
+    lv_obj_align(bar, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_bar_set_range(bar, 100, 10000);
+#endif
 }
 
-
-void loop()   // Put your main code here, to run repeatedly:
+void loop()
 {
     static uint8_t btn_press = 0;
+
+#ifdef ARDUINO_DONGLES3_PLUS
+    int level = pdm.getAudioLevel();
+    lv_bar_set_value(bar, level, LV_ANIM_OFF);
+    // Serial.printf("Audio Level: %d\n", level);
+
+    if (millis() > ir_send_interval) {
+        ir_send_interval = millis() + 1000;
+        irsend.sendNEC(0x12345678, 32);
+    }
+#endif
 
     if (digitalRead(BOOT_PIN) == LOW) {
         btn_press = 1 ^ btn_press;
