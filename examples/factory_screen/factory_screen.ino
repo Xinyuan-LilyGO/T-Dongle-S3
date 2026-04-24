@@ -16,8 +16,13 @@
 #include "esp_lcd_panel_vendor.h"
 #include "esp_lcd_st7735.h"
 
+#ifndef WIFI_SSID
 #define WIFI_SSID            "Your_SSID"
+#endif
+
+#ifndef WIFI_PASSWORD
 #define WIFI_PASSWORD        "Your_PASSWORD"
+#endif
 
 #ifndef BOOT_PIN
 #define BOOT_PIN       0
@@ -382,11 +387,16 @@ void setup()
 void loop()
 {
     static uint8_t btn_press = 0;
+    static uint32_t update_pdm_interval = 0;
 
 #ifdef ARDUINO_DONGLES3_PLUS
     int level = pdm.getAudioLevel();
     lv_bar_set_value(bar, level, LV_ANIM_OFF);
-    // Serial.printf("Audio Level: %d\n", level);
+
+    if (millis() > update_pdm_interval) {
+        Serial.printf("Audio Level: %d\n", level);
+        update_pdm_interval = millis() + 300;
+    }
 
     if (millis() > ir_send_interval) {
         ir_send_interval = millis() + 1000;

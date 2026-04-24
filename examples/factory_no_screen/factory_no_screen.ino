@@ -23,14 +23,21 @@
 #include <FS.h>
 #include <SD_MMC.h>
 #include <WiFi.h>
+#include <WiFiMulti.h>
 
+#ifndef WIFI_SSID
 #define WIFI_SSID            "Your_SSID"
+#endif
+
+#ifndef WIFI_PASSWORD
 #define WIFI_PASSWORD        "Your_PASSWORD"
+#endif
 
 CRGB leds = CRGB::Green;
 CRGB colors[4] = {CRGB::Red, CRGB::Green, CRGB::Blue, CRGB::Black};
 uint32_t rssi_measure_time = 0;
 uint64_t sdCardSize;
+WiFiMulti wifiMulti;
 
 void listDir(fs::FS &fs, const char * dirname, uint8_t levels)
 {
@@ -164,10 +171,16 @@ void setup()
     Serial.println(WIFI_SSID);
     // Serial.print("Password: ");
     // Serial.println(WIFI_PASSWORD);
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD); // Start WiFi without connecting to any network
+
+    // WiFi.begin(WIFI_SSID, WIFI_PASSWORD); // Start WiFi without connecting to any network
+    
+    wifiMulti.addAP(WIFI_SSID, WIFI_PASSWORD);
+#ifdef WIFI_SSID1
+    wifiMulti.addAP(WIFI_SSID1, WIFI_PASSWORD1);
+#endif
 
     // Wait for connection
-    while (WiFi.status() != WL_CONNECTED ) {
+    while (wifiMulti.run() != WL_CONNECTED ) {
         leds = CRGB(random(0, 255), random(0, 255), random(0, 255));
         FastLED.show();
         Serial.print(".");
