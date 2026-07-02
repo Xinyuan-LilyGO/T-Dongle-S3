@@ -88,25 +88,30 @@
 > After the download is complete, unplug the device and power it back on. Do not press the BOOT button while powering > on, otherwise the device will remain in download mode.
 >
 > If you change the USB mode to USB-OTG (TinyUSB) mode during the upload process, you must manually put the device into download mode before the device will be allowed to upload the new firmware.
+>
+> To prevent the encryption chip from being locked, LilyGo does not perform any configuration or read/write operations on the ATECC508A at the factory; it only performs I2C probing to ensure the encryption chip responds to the device normally. For related examples, please refer to [SparkFun_ATECCX08a_Arduino_Library](https://github.com/sparkfun/SparkFun_ATECCX08a_Arduino_Library). Please note that once the device is configured, it will be locked by its inherent configuration; please understand what you are doing.
+>
 
 ### 📍 Pins Map
 
-| Name      | GPIO NUM |
-| --------- | -------- |
-| RGB DIN   | 40       |
-| RGB CLK   | 39       |
-| SDMMC D0  | 14       |
-| SDMMC D1  | 17       |
-| SDMMC D2  | 21       |
-| SDMMC D3  | 18       |
-| SDMMC CLK | 12       |
-| SDMMC CMD | 16       |
-| Button    | 0        |
-| QWIIC TX  | 43       |
-| QWIIC RX  | 44       |
-| PDM CLK   | 9        |
-| PDM DATA  | 8        |
-| IR PIN    | 7        |
+| Name                            | GPIO NUM |
+| ------------------------------- | -------- |
+| RGB DIN                         | 40       |
+| RGB CLK                         | 39       |
+| SDMMC D0                        | 14       |
+| SDMMC D1                        | 17       |
+| SDMMC D2                        | 21       |
+| SDMMC D3                        | 18       |
+| SDMMC CLK                       | 12       |
+| SDMMC CMD                       | 16       |
+| Button                          | 0        |
+| QWIIC TX                        | 43       |
+| QWIIC RX                        | 44       |
+| PDM CLK                         | 9        |
+| PDM DATA                        | 8        |
+| IR PIN                          | 7        |
+| I2C SDA(Encrypted Version Only) | 11       |
+| I2C SCL(Encrypted Version Only) | 10       |
 
 ### ⚡ Electrical parameters
 
@@ -153,3 +158,4 @@
 * [T-Dongle-S3-Plus Schematic](../../../schematic/T-Dongle-S3-Plus.pdf)
 * [Case](../../../case/README.MD)
 * [Display datasheet](../../../datasheet/ST773_datasheet.pdf)
+* [ATECC508A(Encrypted Version Only)](https://cdn.sparkfun.com/assets/learn_tutorials/1/0/0/3/Microchip_ATECC508A_Datasheet.pdf)

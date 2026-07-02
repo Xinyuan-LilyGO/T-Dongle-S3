@@ -11,10 +11,15 @@
 #include "WiFi.h"
 #include <lvgl.h>
 #include <FastLED.h>
+#include <Wire.h>
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_panel_vendor.h"
 #include "esp_lcd_st7735.h"
+#include <WiFiMulti.h>
+
+// If use arduino ide and use t-dongle-s3-plus ,please define ARDUINO_DONGLES3_PLUS
+// #define ARDUINO_DONGLES3_PLUS
 
 #ifndef WIFI_SSID
 #define WIFI_SSID            "Your_SSID"
@@ -66,6 +71,10 @@
 #define MIC_DATA                    8
 #define MIC_SCK                     9
 
+// T-Dongle-S3-Plus Encrypted version Only Pins
+#define I2C_SDA                    11
+#define I2C_SCL                    10
+
 // IR Remote library
 #include <IRsend.h>
 IRsend irsend(IR_SEND_PIN);
@@ -74,6 +83,7 @@ IRsend irsend(IR_SEND_PIN);
 #include "blow_detector.h"
 BlowDetector pdm;
 lv_obj_t *bar;
+WiFiMulti wifi;
 
 LV_IMG_DECLARE(img_logo);
 const void *img_src = &img_logo;
@@ -81,9 +91,6 @@ const void *img_src = &img_logo;
 LV_IMG_DECLARE(img_t_dongle_s3_ce_fcc);
 const void *img_src = &img_t_dongle_s3_ce_fcc;
 #endif
-
-
-
 
 LV_FONT_DECLARE(lv_font_maplemomo_12);
 LV_FONT_DECLARE(lv_font_maplemomo_14);
@@ -116,6 +123,7 @@ uint16_t disp_height = LCD_PIXEL_HEIGHT;
 lv_obj_t *tileview;
 CRGB leds;
 bool vertical_screen = true;
+bool encrypted_chip_present = false;
 
 static void disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *color_p)
 {
@@ -147,10 +155,37 @@ void setup()
     FastLED.addLeds<APA102, LED_DI_PIN, LED_CI_PIN, BGR>(&leds, 1);
     FastLED.setBrightness(100);
 
+
+    // ================ Check encrypted ===================
+    Wire.begin(I2C_SDA, I2C_SCL);
+
+    Serial.println("I2C scan:");
+    for (uint8_t i = 1; i < 127; i++) {
+        Wire.beginTransmission(i);
+        if (Wire.endTransmission() == 0) {
+            Serial.print("\tFound I2C device at address 0x");
+            Serial.println(i, HEX);
+        }
+    }
+
+    // To prevent the encryption chip from being locked, LilyGo does not perform any configuration or read/write operations on the ATECC508A at the factory;
+    // it only performs I2C probing to ensure the encryption chip responds to the device normally.
+    // For related examples, please refer to [SparkFun_ATECCX08a_Arduino_Library](https://github.com/sparkfun/SparkFun_ATECCX08a_Arduino_Library).
+    // Please note that once the device is configured, it will be locked by its inherent configuration; please understand what you are doing.
+    Wire.beginTransmission(0x60);
+    Serial.println("==========================");
+    if (Wire.endTransmission() == 0) {
+        Serial.println("✅Encrypted chip is present");
+        encrypted_chip_present = true;
+    } else {
+        Serial.println("❌Encrypted chip is not present");
+    }
+    Serial.println("==========================");
+
     // ================ Initialize SD card =================
     SD_MMC.setPins(SD_MMC_CLK_PIN, SD_MMC_CMD_PIN, SD_MMC_D0_PIN, SD_MMC_D1_PIN, SD_MMC_D2_PIN, SD_MMC_D3_PIN);
     if (!SD_MMC.begin()) {
-        Serial.println("Card Mount Failed");
+        Serial.println("❌Card Mount Failed");
     }
     uint8_t cardType = SD_MMC.cardType();
     if (cardType != CARD_NONE) {
@@ -164,7 +199,7 @@ void setup()
         } else {
             Serial.println("UNKNOWN");
         }
-        Serial.printf("SD_MMC Card Size: %llu bytes\n", SD_MMC.cardSize());
+        Serial.printf("✅SD_MMC Card Size: %llu bytes\n", SD_MMC.cardSize());
     }
 
     // ================= Initialize SPI bus =================
@@ -231,7 +266,15 @@ void setup()
     lv_obj_t *cont = lv_obj_create(tile2);
     lv_obj_set_size(cont, lv_pct(100), lv_pct(100));
     lv_obj_set_style_border_width(cont, 5, 0);
-    lv_obj_set_style_border_color(cont, lv_color_make(69, 163, 76), 0);
+
+    if (encrypted_chip_present) {
+        // if encrypted chip is present show green border
+        lv_obj_set_style_border_color(cont, lv_color_make(0, 0xFF, 0), 0);
+    } else {
+        // if no encrypted chip is present show red border
+        lv_obj_set_style_border_color(cont, lv_color_make(0xFF, 0, 0), 0);
+    }
+
     lv_obj_set_scroll_dir(cont, LV_DIR_NONE);
     lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_OFF);
 
@@ -365,7 +408,14 @@ void setup()
         lv_timer_del(timer);
     }, 3000, NULL);
 
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+    // Add WiFi credentials
+    wifi.addAP(WIFI_SSID, WIFI_PASSWORD);
+
+#ifdef WIFI_SSID2
+    wifi.addAP(WIFI_SSID2, WIFI_PASSWORD2);
+#endif
+
 
 #ifdef ARDUINO_DONGLES3_PLUS
     // ======================= Initialize IR =======================
@@ -418,5 +468,9 @@ void loop()
     }
 
     lv_timer_handler();
+
+    wifi.run();
+
+
     delay(5);
 }
