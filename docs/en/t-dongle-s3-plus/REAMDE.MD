@@ -14,9 +14,9 @@
 
 ### Product
 
-| Product               | SOC      | Flash          | SRAM   | PSRAM    |
-| --------------------- | -------- | -------------- | ------ | -------- |
-| [T-Dongle-S3-Plus][1] | ESP32-S3 | 16MB(Quad-SPI) | 512 KB | 8MB(OPI) |
+| Product               | SOC      | Flash          | SRAM   | PSRAM    | Encrypt Chip |
+| --------------------- | -------- | -------------- | ------ | -------- | ------------ |
+| [T-Dongle-S3-Plus][1] | ESP32-S3 | 16MB(Quad-SPI) | 512 KB | 8MB(OPI) | ATECC508A    |
 
 [1]: https://lilygo.cc/products/t-dongle-s3
 
@@ -94,24 +94,24 @@
 
 ### 📍 Pins Map
 
-| Name                            | GPIO NUM |
-| ------------------------------- | -------- |
-| RGB DIN                         | 40       |
-| RGB CLK                         | 39       |
-| SDMMC D0                        | 14       |
-| SDMMC D1                        | 17       |
-| SDMMC D2                        | 21       |
-| SDMMC D3                        | 18       |
-| SDMMC CLK                       | 12       |
-| SDMMC CMD                       | 16       |
-| Button                          | 0        |
-| QWIIC TX                        | 43       |
-| QWIIC RX                        | 44       |
-| PDM CLK                         | 9        |
-| PDM DATA                        | 8        |
-| IR PIN                          | 7        |
-| I2C SDA(Encrypted Version Only) | 11       |
-| I2C SCL(Encrypted Version Only) | 10       |
+| Name               | GPIO NUM |
+| ------------------ | -------- |
+| RGB DIN            | 40       |
+| RGB CLK            | 39       |
+| SDMMC D0           | 14       |
+| SDMMC D1           | 17       |
+| SDMMC D2           | 21       |
+| SDMMC D3           | 18       |
+| SDMMC CLK          | 12       |
+| SDMMC CMD          | 16       |
+| Button             | 0        |
+| QWIIC TX           | 43       |
+| QWIIC RX           | 44       |
+| PDM CLK            | 9        |
+| PDM DATA           | 8        |
+| IR PIN             | 7        |
+| I2C SDA(ATECC508A) | 11       |
+| I2C SCL(ATECC508A) | 10       |
 
 ### ⚡ Electrical parameters
 
@@ -128,14 +128,14 @@
 | Display Size | 0.96 Inch    |
 | Driver IC    | ST7735 (SPI) |
 
-### QWIIC Connector
+<!-- ### QWIIC Connector
 
 ![QWIIC](../../static/QWIIC.png)
 
 * The QWIIC interface is configured for serial port functionality by default. If you want to use it for I2C functionality, you need to add a pull-up resistor to the external sensor.
 * Examples:
     - [QWIIC I2C example](../../../examples/qwiic_i2c_scan/qwiic_i2c_scan.ino)
-    - [QWIIC Uart example](../../../examples/qwiic_uart_loopback/qwiic_uart_loopback.ino)
+    - [QWIIC Uart example](../../../examples/qwiic_uart_loopback/qwiic_uart_loopback.ino) -->
 
 ### Button Description
 
