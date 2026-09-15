@@ -26,7 +26,7 @@
     <!-- T-Dongle-S3-Plus -->
     <td style="padding: 10px 20px; width: 33.33%; border: 0; background: transparent;">
       <a href="./docs/en/t-dongle-s3-plus/REAMDE.MD" style="text-decoration: none; display: block;">
-        <img src="./images/product/png/T-Dongle-S3.png" alt="T-Dongle-S3-Plus" width="200" style="border: 0;"/>
+        <img src="./images/product/png/T-Dongle-S3-Plus.png" alt="T-Dongle-S3-Plus" width="200" style="border: 0;"/>
         <div style="color: #FFFF; font-weight: 600; margin-top: 8px;">T-Dongle-S3-Plus Quick Start</div>
       </a>
     </td>

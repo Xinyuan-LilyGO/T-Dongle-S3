@@ -9,7 +9,7 @@
 * This page introduces the hardware parameters related to `LilyGo T-Dongle-S3-Plus`
 
 <div align="center" markdown="1">
-  <img src="../../../images/product/png/T-Dongle-S3-2.png" alt="LilyGo logo" width="480"/>
+  <img src="../../../images/product/png/T-Dongle-S3-Plus.png" alt="LilyGo logo" width="480"/>
 </div>
 
 ### Product
