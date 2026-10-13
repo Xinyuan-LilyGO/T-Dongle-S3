@@ -124,6 +124,11 @@
 | Core 2  RGB DIN | 40       |
 | Core 2  RGB CLK | 39       |
 
+> \[!TIP]
+>
+> There is no connection between the two cores.
+>
+
 ### ⚡ Electrical parameters
 
 | Features                 | Details   |
