@@ -160,3 +160,4 @@
 
 * [T-Dongle-S3 Dual Schematic](../../../schematic/T-Dongle-DualS3.pdf)
 * [Case](../../../case/README.MD)
+* [USB3.0 dimension](../../../case/USB3.0.dwg)

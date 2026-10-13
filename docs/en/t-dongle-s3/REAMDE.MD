@@ -150,3 +150,4 @@
 * [T-Dongle-S3 Schematic](../../../schematic/T-Dongle-S3-QWIIC.pdf)
 * [Case](../../../case/README.MD)
 * [Display datasheet](../../../datasheet/ST773_datasheet.pdf)
+* [USB3.0 dimension](../../../case/USB3.0.dwg)

@@ -159,3 +159,4 @@
 * [Case](../../../case/README.MD)
 * [Display datasheet](../../../datasheet/ST773_datasheet.pdf)
 * [ATECC508A(Encrypted Version Only)](https://cdn.sparkfun.com/assets/learn_tutorials/1/0/0/3/Microchip_ATECC508A_Datasheet.pdf)
+* [USB3.0 dimension](../../../case/USB3.0.dwg)
